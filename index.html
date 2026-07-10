@@ -3,20 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>TRAP LAB — ARトラップ練習</title>
+<title>TRAP CONTROL — ARトラップ&キック</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --pitch:#0B1F16;        /* ナイター芝の闇 */
-    --chalk:#F2F5F0;        /* 石灰ライン */
-    --volt:#C8FF4D;         /* スパイクのボルトカラー */
-    --teal:#5DD9C1;         /* GOOD */
-    --amber:#FFB454;        /* HARD */
-    --red:#FF5D5D;          /* MISS */
+    --pitch:#0B1F16; --chalk:#F2F5F0; --volt:#C8FF4D;
+    --teal:#5DD9C1; --amber:#FFB454; --red:#FF5D5D;
     --ink:rgba(6,16,11,.78);
-    --display:'Anton', sans-serif;
-    --mono:'IBM Plex Mono', monospace;
+    --display:'Anton', sans-serif; --mono:'IBM Plex Mono', monospace;
     --body:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -27,60 +22,60 @@
     background:radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(6,16,11,.55) 100%)}
   canvas#game{position:absolute;inset:0;width:100%;height:100%}
 
-  /* ---------- HUD ---------- */
   #hud{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between}
   .scoreboard{display:flex;gap:1px;margin:14px auto 0;background:rgba(242,245,240,.14);
     border:1px solid rgba(242,245,240,.25);backdrop-filter:blur(6px)}
-  .cell{background:var(--ink);padding:8px 18px 10px;text-align:center;min-width:88px}
+  .cell{background:var(--ink);padding:8px 16px 10px;text-align:center;min-width:80px}
   .cell .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.18em;opacity:.65}
-  .cell .val{font-family:var(--display);font-size:30px;line-height:1.05;letter-spacing:.02em;color:var(--chalk)}
+  .cell .val{font-family:var(--display);font-size:28px;line-height:1.05;letter-spacing:.02em}
   .cell .val.volt{color:var(--volt)}
   #coach{margin:0 auto 22px;max-width:min(560px,88vw);background:var(--ink);
-    border-left:3px solid var(--volt);padding:10px 16px;font-size:14px;line-height:1.6;
-    backdrop-filter:blur(6px)}
+    border-left:3px solid var(--volt);padding:10px 16px;font-size:14px;line-height:1.6;backdrop-filter:blur(6px)}
   #coach b{color:var(--volt)}
   #meter{position:absolute;left:14px;bottom:22px;width:10px;height:130px;
     border:1px solid rgba(242,245,240,.3);background:rgba(6,16,11,.5)}
   #meterFill{position:absolute;bottom:0;left:0;right:0;height:0%;background:var(--volt);transition:height .08s}
-  #meterLbl{position:absolute;left:30px;bottom:22px;font-family:var(--mono);font-size:10px;
-    letter-spacing:.15em;opacity:.6;writing-mode:vertical-rl}
+  #meterLbl{position:absolute;left:30px;bottom:22px;font-family:var(--mono);font-size:10px;letter-spacing:.15em;opacity:.6;writing-mode:vertical-rl}
 
-  /* ---------- 判定フラッシュ ---------- */
-  #verdict{position:absolute;left:50%;top:34%;transform:translate(-50%,-50%) scale(.6);
-    font-family:var(--display);font-size:clamp(48px,12vw,96px);letter-spacing:.03em;
-    opacity:0;pointer-events:none;text-shadow:0 4px 30px rgba(0,0,0,.6)}
-  #verdict.show{animation:pop .9s ease-out forwards}
+  #verdict{position:absolute;left:50%;top:32%;transform:translate(-50%,-50%) scale(.6);
+    font-family:var(--display);font-size:clamp(44px,11vw,88px);letter-spacing:.03em;
+    opacity:0;pointer-events:none;text-shadow:0 4px 30px rgba(0,0,0,.6);text-align:center;line-height:1}
+  #verdict small{display:block;font-family:var(--mono);font-size:clamp(12px,3vw,16px);letter-spacing:.2em;margin-top:6px}
+  #verdict.show{animation:pop 1.1s ease-out forwards}
   @keyframes pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}
     12%{opacity:1;transform:translate(-50%,-50%) scale(1.06)}
-    30%{transform:translate(-50%,-50%) scale(1)}
-    80%{opacity:1}100%{opacity:0;transform:translate(-50%,-52%) scale(1)}}
+    30%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}
+    100%{opacity:0;transform:translate(-50%,-52%) scale(1)}}
 
-  /* ---------- タッチ解析カード ---------- */
   #analysis{position:absolute;right:14px;bottom:22px;width:min(300px,72vw);
     background:var(--ink);border:1px solid rgba(242,245,240,.22);backdrop-filter:blur(8px);
     padding:12px 14px;transform:translateY(16px);opacity:0;transition:.35s;pointer-events:none}
   #analysis.show{transform:none;opacity:1}
   #analysis h3{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--volt);margin-bottom:8px}
-  #wave{width:100%;height:56px;display:block;margin-bottom:8px}
-  .bars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;
-    font-family:var(--mono);font-size:11px}
+  #wave{width:100%;height:48px;display:block;margin-bottom:8px}
+  .bars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;font-family:var(--mono);font-size:11px}
   .bar{height:6px;background:rgba(242,245,240,.15);position:relative}
   .bar i{position:absolute;inset:0 auto 0 0;background:var(--teal)}
   .bars .pct{opacity:.8;min-width:34px;text-align:right}
+  #kickRow{margin-top:8px;padding-top:8px;border-top:1px dashed rgba(242,245,240,.25);
+    font-family:var(--mono);font-size:12px;display:flex;justify-content:space-between}
+  #kickRow b{color:var(--volt)}
 
-  /* ---------- オーバーレイ ---------- */
-  .overlay{position:absolute;inset:0;background:linear-gradient(rgba(6,16,11,.82),rgba(6,16,11,.92));
-    display:flex;align-items:center;justify-content:center;z-index:20}
-  .panel{max-width:520px;width:88vw;border:1px solid rgba(242,245,240,.25);padding:28px 26px;background:rgba(11,31,22,.6)}
+  .overlay{position:absolute;inset:0;background:linear-gradient(rgba(6,16,11,.85),rgba(6,16,11,.94));
+    display:flex;align-items:center;justify-content:center;z-index:20;overflow:auto}
+  .panel{max-width:560px;width:90vw;border:1px solid rgba(242,245,240,.25);padding:26px 24px;background:rgba(11,31,22,.6);margin:20px 0}
   .panel .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.28em;color:var(--volt)}
-  .panel h1{font-family:var(--display);font-size:clamp(40px,9vw,64px);line-height:1;margin:6px 0 4px;letter-spacing:.02em}
+  .panel h1{font-family:var(--display);font-size:clamp(38px,8.5vw,60px);line-height:1;margin:6px 0 4px;letter-spacing:.02em}
   .panel h1 span{color:var(--volt)}
-  .panel p{font-size:14px;line-height:1.85;opacity:.9;margin:12px 0}
-  .panel .steps{border-top:1px dashed rgba(242,245,240,.3);margin-top:14px;padding-top:14px;font-size:13px;line-height:1.9}
-  .panel .steps b{color:var(--volt);font-family:var(--mono)}
-  .btnrow{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .panel p{font-size:13.5px;line-height:1.8;opacity:.9;margin:10px 0}
+  .rulebox{border:1px dashed rgba(242,245,240,.3);padding:12px 14px;margin:12px 0;font-size:13px;line-height:1.9}
+  .rulebox b{color:var(--volt);font-family:var(--mono)}
+  #setup{display:flex;gap:14px;align-items:center;margin:12px 0}
+  #setup svg{flex:0 0 auto}
+  #setup p{font-size:12px;line-height:1.7;opacity:.85;margin:0}
+  .btnrow{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
   button{font-family:var(--body);font-weight:700;font-size:15px;cursor:pointer;border:0;
-    padding:13px 22px;background:var(--volt);color:#0B1F16;letter-spacing:.04em}
+    padding:13px 20px;background:var(--volt);color:#0B1F16;letter-spacing:.04em}
   button.ghost{background:transparent;color:var(--chalk);border:1px solid rgba(242,245,240,.4)}
   button:active{transform:translateY(1px)}
   .hidden{display:none !important}
@@ -100,9 +95,9 @@
     <div class="scoreboard">
       <div class="cell"><div class="lbl">SCORE</div><div class="val volt" id="score">0</div></div>
       <div class="cell"><div class="lbl">STREAK</div><div class="val" id="streak">0</div></div>
-      <div class="cell"><div class="lbl">TOUCH AVG</div><div class="val" id="avg">–</div></div>
+      <div class="cell"><div class="lbl">BEST</div><div class="val" id="best">0</div></div>
     </div>
-    <div id="coach">キャリブレーション中… 画面の前で軽く動いてください。</div>
+    <div id="coach">モードを選んで開始してください。</div>
   </div>
 
   <div id="meter"><div id="meterFill"></div></div>
@@ -111,31 +106,49 @@
   <div id="verdict"></div>
 
   <div id="analysis">
-    <h3>TOUCH ANALYSIS ── タッチ解析</h3>
-    <canvas id="wave" width="272" height="56"></canvas>
+    <h3>TOUCH ANALYSIS ── 5要素解析</h3>
+    <canvas id="wave" width="272" height="48"></canvas>
     <div class="bars">
-      <span>タイミング</span><div class="bar"><i id="bTiming"></i></div><span class="pct" id="pTiming">–</span>
-      <span>衝撃吸収</span><div class="bar"><i id="bCushion"></i></div><span class="pct" id="pCushion">–</span>
-      <span>安定性</span><div class="bar"><i id="bSteady"></i></div><span class="pct" id="pSteady">–</span>
+      <span>①姿勢/予備動作</span><div class="bar"><i id="bPosture"></i></div><span class="pct" id="pPosture">–</span>
+      <span>②ポイント</span><div class="bar"><i id="bPoint"></i></div><span class="pct" id="pPoint">–</span>
+      <span>③タイミング</span><div class="bar"><i id="bTiming"></i></div><span class="pct" id="pTiming">–</span>
+      <span>④吸収</span><div class="bar"><i id="bCushion"></i></div><span class="pct" id="pCushion">–</span>
     </div>
+    <div id="kickRow"><span>⑤キックまで</span><b id="kickTime">–</b></div>
   </div>
 
   <div class="overlay" id="startOverlay">
     <div class="panel">
       <div class="eyebrow">AR MOTION TRAINING</div>
-      <h1>TRAP <span>LAB</span></h1>
-      <p>カメラの前に立つと、物理演算されたボールがあなたに向かって飛んできます。着弾点に現れる<b style="color:var(--volt)">チョークサークル</b>に体（足・腿・胸）を合わせ、当たる瞬間に「引く」動きでボールの勢いを吸収してください。</p>
-      <div class="steps">
-        <b>01</b> 2〜3m離れて全身〜下半身が映る位置に立つ<br>
-        <b>02</b> サークルの色が変わる瞬間 ＝ 接触タイミング<br>
-        <b>03</b> 硬く突くと弾きます。柔らかく引いて吸収する<br>
+      <h1>TRAP <span>CONTROL</span></h1>
+
+      <div class="rulebox">
+        <b>RULE 1</b> あなたの周りに<b>コントロールサークル</b>が描かれます。トラップしたボールが円の外に出たら <b>OUT</b>（0点）。<br>
+        <b>RULE 2</b> ボールを止めたら即 <b>KICK!</b> の合図。蹴る動きが早いほどボーナス加算。<br>
+        <b>SCORE</b> ＝ トラップ精度（姿勢・ポイント・タイミング・吸収）＋ キック速度 × 連続ボーナス
       </div>
+
+      <div id="setup">
+        <svg width="120" height="110" viewBox="0 0 120 110">
+          <ellipse cx="60" cy="62" rx="34" ry="15" fill="none" stroke="#C8FF4D" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <circle cx="60" cy="62" r="5" fill="#F2F5F0"/>
+          <text x="60" y="52" fill="#F2F5F0" font-size="8" text-anchor="middle" font-family="monospace">PLAYER</text>
+          <line x1="60" y1="8" x2="60" y2="42" stroke="#5DD9C1" stroke-width="1.5" marker-end="url(#a)"/>
+          <text x="60" y="6" fill="#5DD9C1" font-size="7" text-anchor="middle" font-family="monospace">BALL</text>
+          <rect x="98" y="20" width="10" height="16" rx="2" fill="none" stroke="#FFB454" stroke-width="1.5" transform="rotate(40 103 28)"/>
+          <line x1="97" y1="34" x2="72" y2="54" stroke="#FFB454" stroke-width="1" stroke-dasharray="3 2"/>
+          <text x="104" y="50" fill="#FFB454" font-size="7" text-anchor="middle" font-family="monospace">CAM 45°</text>
+          <defs><marker id="a" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#5DD9C1"/></marker></defs>
+        </svg>
+        <p><b style="color:var(--amber)">カメラは斜め前45°</b>に置くのが推奨。距離2.5〜3m・高さ約1m（腰）。前後の「引き」と左右の動きの両方が映り、画面も視界に入ります。足元〜胸が映る画角にしてください。</p>
+      </div>
+
       <div class="btnrow">
         <button id="btnCam">カメラで開始</button>
-        <button id="btnSensor" class="ghost">スマホを振って開始（センサー）</button>
+        <button id="btnSensor" class="ghost">センサー（スマホを振る）</button>
         <button id="btnTouch" class="ghost">タップ操作</button>
       </div>
-      <p style="font-size:12px;opacity:.6;margin-top:12px">※ アプリ内プレビューではカメラがブロックされることがあります。その場合は「センサー」モードか、ファイルをダウンロードしてブラウザで開いてください。</p>
+      <p style="font-size:12px;opacity:.6;margin-top:10px">※ アプリ内プレビューではカメラがブロックされることがあります。GitHub Pages / ブラウザ直接ならカメラ可。</p>
     </div>
   </div>
 </div>
@@ -143,10 +156,15 @@
 <script>
 'use strict';
 /* =========================================================
-   TRAP LAB — ARサッカートラップ練習
-   ・3D弾道の物理エンジン（重力 / 空気抵抗 / マグヌス / バウンド）
-   ・Webカメラのフレーム差分による動作解析
-   ・接触前後400msの運動波形から タイミング / 吸収 / 安定性 を採点
+   TRAP CONTROL — ARトラップ&キック
+   判定5要素:
+     ① 姿勢/予備動作  … 到達前700msの下半身アクティビティ
+     ② インパクトポイント … 接触時の動き重心とゾーン中心の一致
+     ③ インパクト確度(タイミング) … 動きピークと接触時刻の誤差
+     ④ クッション動作 … 接触後の運動減衰カーブ
+     ⑤ キック速度 … ボール静止→キック動作までの反応時間
+   ルール: トラップ品質→物理演算でボールが転がり、
+   コントロールサークル(半径1.4m)外に出たら OUT。
 ========================================================= */
 
 const $=id=>document.getElementById(id);
@@ -163,28 +181,25 @@ function resize(){
 }
 addEventListener('resize',resize);resize();
 
-/* ---------- カメラ座標系 ----------
-   ワールド: x=左右[m], y=高さ[m](地面0), z=奥行き[m](プレイヤー0, 奥+)
-   カメラは高さ1.5m、わずかに見下ろし。 */
+/* ---------- 座標系: x=左右[m] y=高さ[m] z=奥行き[m](プレイヤー0.8) ---------- */
 const CAM={h:1.5, f:()=>H*0.9};
 function project(x,y,z){
-  const zz=Math.max(z+1.6,0.35);           // カメラは z=-1.6 に置く
+  const zz=Math.max(z+1.6,0.35);
   const s=CAM.f()/zz;
   return {sx:W/2 + x*s, sy:H*0.52 - (y-CAM.h*0.62)*s, s};
 }
+const CIRCLE={cx:0, cz:0.8, r:1.4};   // コントロールサークル
 
-/* ---------- 物理エンジン ---------- */
+/* ---------- 物理 ---------- */
 const G=9.81, RHO=1.2, R=0.11, A=Math.PI*R*R, M=0.43, CD=0.25, CL=0.20;
 function makeServe(level){
   const type=['ground','driven','loft'][Math.floor(Math.random()*3)];
   const z0=16+Math.random()*4;
-  const targetX=(Math.random()*2-1)*Math.min(1.4,W/900);   // 画面内に収まる範囲
-  const T=Math.max(1.25, 2.1-level*0.08);                  // 到達時間（レベルで短縮）
+  const targetX=(Math.random()*2-1)*Math.min(1.0,W/1000);
+  const T=Math.max(1.25, 2.1-level*0.08);
   const b={x:targetX*0.3, y:0.3, z:z0, type, spin:(Math.random()*2-1)*6, trail:[], bounced:0};
-  // 到達点の高さ → トラップ部位が決まる
   b.targetY = type==='ground'?0.15 : type==='driven'? 0.5+Math.random()*0.3 : 1.05+Math.random()*0.25;
-  // 簡易射出解（抵抗ぶんは係数で補正）
-  b.vz=-(z0-0.9)/T*1.12;
+  b.vz=-(z0-CIRCLE.cz)/T*1.12;
   b.vx=(targetX-b.x)/T;
   b.vy=(b.targetY-b.y)/T + 0.5*G*T*(type==='loft'?0.95:type==='driven'?0.55:0.25);
   if(type==='ground'){b.y=0.12;b.vy=0.4;}
@@ -195,24 +210,29 @@ function stepBall(b,dt){
   const v=Math.hypot(b.vx,b.vy,b.vz)||1e-6;
   const k=0.5*RHO*A/M;
   const drag=k*CD*v;
-  // マグヌス（横回転→x方向に曲がる）
   const mag=k*CL*v*b.spin*0.15;
   b.vx+=(-drag*b.vx + mag*b.vz/v)*dt;
   b.vy+=(-G -drag*b.vy)*dt;
   b.vz+=(-drag*b.vz - mag*b.vx/v)*dt;
   b.x+=b.vx*dt; b.y+=b.vy*dt; b.z+=b.vz*dt;
-  if(b.y<R && b.vy<0){ b.y=R; b.vy*=-0.62; b.vx*=0.85; b.vz*=0.9; b.bounced++; }
-  b.trail.push({x:b.x,y:b.y,z:b.z,t:performance.now()});
+  if(b.y<R && b.vy<0){ b.y=R; b.vy*=-0.55; b.vx*=0.85; b.vz*=0.88; b.bounced++; }
+  if(b.y<=R+0.01){ // 転がり摩擦
+    const f=Math.max(0,1-2.2*dt);
+    b.vx*=f;b.vz*=f;
+  }
+  b.trail.push({x:b.x,y:b.y,z:b.z});
   if(b.trail.length>26)b.trail.shift();
 }
+const planarDist=b=>Math.hypot(b.x-CIRCLE.cx, b.z-CIRCLE.cz);
+const ballSpeed=b=>Math.hypot(b.vx,b.vy,b.vz);
 
-/* ---------- 動作解析（フレーム差分） ---------- */
+/* ---------- 動作解析（フレーム差分 + 重心 + 下半身分離） ---------- */
 const AN_W=96, AN_H=72;
 const anC=document.createElement('canvas');anC.width=AN_W;anC.height=AN_H;
 const anx=anC.getContext('2d',{willReadFrequently:true});
-let prevFrame=null, baseline=4, camReady=false;
-const motionBuf=[];                    // {t, zone, total}
-let zoneRect={x:.5,y:.7,r:.12};        // 画面比率でのトラップゾーン
+let prevFrame=null, baseline=4, baseLower=1, camReady=false;
+const motionBuf=[];   // {t, zone, cx, cy, lower}
+let zoneRect={x:.5,y:.7,r:.12};
 
 function coverSrcRect(){
   const vw=video.videoWidth,vh=video.videoHeight;
@@ -227,144 +247,229 @@ function sampleMotion(now){
   if(!camReady)return;
   const src=coverSrcRect(); if(!src)return;
   anx.save();
-  anx.translate(AN_W,0);anx.scale(-1,1);   // 画面と同じ鏡像座標に
+  anx.translate(AN_W,0);anx.scale(-1,1);
   anx.drawImage(video,src.sx,src.sy,src.sw,src.sh,0,0,AN_W,AN_H);
   anx.restore();
   const cur=anx.getImageData(0,0,AN_W,AN_H);
-  let zone=0,total=0,zn=0;
+  let zone=0,lower=0,ln=0,sumX=0,sumY=0;
   if(prevFrame){
     const zx=zoneRect.x*AN_W, zy=zoneRect.y*AN_H, zr=zoneRect.r*AN_W*1.35;
+    const lowY=AN_H*0.55;
     const d=cur.data,p=prevFrame.data;
     for(let y=0;y<AN_H;y+=2)for(let x=0;x<AN_W;x+=2){
       const i=(y*AN_W+x)*4;
       const diff=Math.abs(d[i]-p[i])+Math.abs(d[i+1]-p[i+1])+Math.abs(d[i+2]-p[i+2]);
       if(diff>34){
-        total++;
+        if(y>lowY)lower++;
         const dx=x-zx,dy=y-zy;
-        if(dx*dx+dy*dy<zr*zr){zone++;}
+        if(dx*dx+dy*dy<zr*zr){zone++;sumX+=dx/zr;sumY+=dy/zr;}
       }
-      zn++;
+      if(y>lowY)ln++;
     }
   }
   prevFrame=cur;
-  const zoneNorm=zone/ (Math.PI*Math.pow(zoneRect.r*AN_W*1.35,2)/4) *100;
-  motionBuf.push({t:now, zone:zoneNorm, total:total/zn*100});
-  while(motionBuf.length && now-motionBuf[0].t>1600)motionBuf.shift();
+  const zoneNorm=zone/(Math.PI*Math.pow(zoneRect.r*AN_W*1.35,2)/4)*100;
+  motionBuf.push({t:now, zone:zoneNorm,
+    cx:zone?sumX/zone:0, cy:zone?sumY/zone:0,
+    lower:ln?lower/ln*100:0});
+  while(motionBuf.length && now-motionBuf[0].t>2000)motionBuf.shift();
   $('meterFill').style.height=Math.min(100,zoneNorm*2.2)+'%';
 }
 
 /* ---------- 採点 ---------- */
-function judgeTouch(contactT){
-  // 接触±400msの窓
+function judgeTrap(contactT){
+  if(inputMode==='tap') return judgeTap(contactT);
+  if(inputMode==='sensor') return judgeSensor(contactT);
   const win=motionBuf.filter(m=>Math.abs(m.t-contactT)<=420);
-  if(inputMode==='tap'){ return judgeTap(contactT); }
   if(win.length<4) return {miss:true,wave:win,reason:'動きが検出できませんでした'};
-  let peak=0,peakT=contactT,sum=0;
-  for(const m of win){ sum+=m.zone; if(m.zone>peak){peak=m.zone;peakT=m.t;} }
-  if(peak<baseline*1.6+3) return {miss:true,wave:win,reason:inputMode==='sensor'?'動きが検出できませんでした。もう少しはっきり引いてみて':'サークル内で動きがありませんでした'};
+  let peak=0,peakM=null,sum=0;
+  for(const m of win){sum+=m.zone;if(m.zone>peak){peak=m.zone;peakM=m;}}
+  if(peak<baseline*1.6+3) return {miss:true,wave:win,reason:'サークル内で動きがありませんでした'};
 
-  // タイミング: ピークが接触±160ms以内なら満点
-  const dtErr=peakT-contactT;
+  // ③タイミング
+  const dtErr=peakM.t-contactT;
   const timing=Math.max(0,1-Math.max(0,Math.abs(dtErr)-60)/300);
-  // 吸収: 接触後(50〜350ms)の運動がピーク比で滑らかに減衰しているか
+  // ②インパクトポイント: ピーク時の動き重心がゾーン中心にどれだけ近いか
+  const point=Math.max(0,1-Math.hypot(peakM.cx,peakM.cy)*1.15);
+  // ④吸収
   const after=win.filter(m=>m.t>contactT+40&&m.t<contactT+360);
   const afterAvg=after.length?after.reduce((a,m)=>a+m.zone,0)/after.length:peak;
   const ratio=afterAvg/(peak||1);
-  // 0.3〜0.65 が理想の「引き」。1に近い=突っ張り、0=止め刺し
   const cushion=Math.max(0,1-Math.abs(ratio-0.45)/0.45);
-  // 安定性: 窓内の揺らぎ（分散が小さいほど良い）
-  const mean=sum/win.length;
-  const varr=win.reduce((a,m)=>a+(m.zone-mean)**2,0)/win.length;
-  const steady=Math.max(0,1-Math.sqrt(varr)/(mean*1.6+8));
-  return {miss:false,timing,cushion,steady,dtErr,wave:win};
-}
+  // ①姿勢/予備動作: 到達前120〜750msの下半身アクティビティ
+  const pre=motionBuf.filter(m=>m.t>contactT-750&&m.t<contactT-120);
+  const preLower=pre.length?pre.reduce((a,m)=>a+m.lower,0)/pre.length:0;
+  const posture=Math.min(1,Math.max(0,(preLower-baseLower*0.8)/3.2));
 
-/* タップモード: 押した瞬間=接触、押している長さ=引き */
+  const q=timing*0.3+cushion*0.3+point*0.2+posture*0.2;
+  return {miss:false,q,timing,cushion,point,posture,dtErr,wave:win};
+}
+function judgeSensor(contactT){
+  const win=motionBuf.filter(m=>Math.abs(m.t-contactT)<=420);
+  if(!win.length)return {miss:true,wave:[],reason:'動きが検出できませんでした'};
+  let peak=0,peakT=contactT;
+  for(const m of win){if(m.zone>peak){peak=m.zone;peakT=m.t;}}
+  if(peak<6)return {miss:true,wave:win,reason:'引く動きが検出できませんでした'};
+  const dtErr=peakT-contactT;
+  const timing=Math.max(0,1-Math.max(0,Math.abs(dtErr)-60)/300);
+  const after=win.filter(m=>m.t>contactT+40&&m.t<contactT+360);
+  const afterAvg=after.length?after.reduce((a,m)=>a+m.zone,0)/after.length:peak;
+  const cushion=Math.max(0,1-Math.abs(afterAvg/(peak||1)-0.45)/0.45);
+  const q=timing*0.55+cushion*0.45;
+  return {miss:false,q,timing,cushion,point:null,posture:null,dtErr,wave:win};
+}
 let tapDown=null,tapUp=null;
 function judgeTap(contactT){
   if(tapDown==null)return {miss:true,wave:[],reason:'タップがありませんでした'};
   const dtErr=tapDown-contactT;
   const timing=Math.max(0,1-Math.max(0,Math.abs(dtErr)-70)/300);
   const hold=(tapUp??performance.now())-tapDown;
-  const cushion=Math.max(0,1-Math.abs(hold-200)/260);   // 約200msのホールドが理想
-  return {miss:timing<=0,timing,cushion,steady:(timing+cushion)/2,dtErr,wave:[]};
+  const cushion=Math.max(0,1-Math.abs(hold-200)/260);
+  const q=timing*0.55+cushion*0.45;
+  return {miss:timing<=0,q,timing,cushion,point:null,posture:null,dtErr,wave:[]};
 }
 
-/* ---------- ゲーム状態 ---------- */
+/* ---------- 状態 ---------- */
 let inputMode='cam', playing=false, ball=null, level=0;
-let score=0,streak=0,history=[];
-let phase='idle', phaseT=0, contactAt=0, lastVerdict=null;
+let score=0,streak=0,best=+(localStorage&&0)||0;
+let phase='idle', phaseT=0, contactAt=0;
+let trapResult=null, settleT=0, kickT=null, kickDeadline=0;
 let particles=[];
 
 function serve(){
   ball=makeServe(level);
   phase='flight';
-  const p=project(ball.x+ball.vx*ball.T, ball.targetY, 0.9);
-  zoneRect={x:p.sx/W, y:Math.min(.88,p.sy/H), r:0.11};
+  const p=project(ball.x+ball.vx*ball.T, ball.targetY, CIRCLE.cz+0.1);
+  zoneRect={x:Math.min(.92,Math.max(.08,p.sx/W)), y:Math.min(.88,p.sy/H), r:0.11};
   contactAt=performance.now()+ball.T*1000;
-  tapDown=tapUp=null;
+  tapDown=tapUp=null;trapResult=null;kickT=null;
   const part=ball.targetY>0.95?'胸':ball.targetY>0.42?'腿':'インサイド';
-  coach(`来ます — <b>${part}</b>でトラップ。当たる瞬間に柔らかく引いて。`);
+  coach(`来ます — <b>${part}</b>でトラップ。円の外に出したらOUT。`);
 }
 
-function resolveTouch(){
-  const r=judgeTouch(contactAt);
-  let grade,color,pts=0;
-  if(r.miss){grade='MISS';color='var(--red)';streak=0;
-    coach(r.reason+`。サークルに<b>先に体を置いて</b>待ちましょう。`);}
-  else{
-    const q=r.timing*0.45+r.cushion*0.35+r.steady*0.2;
-    history.push(q);if(history.length>10)history.shift();
-    if(q>0.78){grade='PERFECT TOUCH';color='var(--volt)';pts=100;streak++;
-      coach('完璧な吸収。ボールが<b>足元に吸い付く</b>タッチです。');}
-    else if(q>0.55){grade='GOOD';color='var(--teal)';pts=60;streak++;
-      coach(r.timing<r.cushion?'タイミングを微調整。<b>ピークを接触の瞬間</b>に。':'もう少し<b>引き足</b>を長く使って吸収を。');}
-    else{grade='HARD TOUCH';color='var(--amber)';pts=25;streak=0;
-      coach(r.dtErr<-120?'<b>早すぎ</b>ます。ボールを最後まで見て。':r.dtErr>120?'<b>遅れて</b>います。準備を早く。':'足が硬い。<b>触る瞬間に力を抜く</b>のがコツ。');}
-    pts=Math.round(pts*(1+streak*0.1));score+=pts;level=Math.min(10,Math.floor(score/300));
-    showAnalysis(r);
-    if(!reduceMotion)burst(project(ball.x,ball.y,ball.z), grade==='PERFECT TOUCH'?'#C8FF4D':grade==='GOOD'?'#5DD9C1':'#FFB454');
+function resolveTrap(){
+  const r=judgeTrap(contactAt);
+  trapResult=r;
+  if(r.miss){
+    // ミス: ボールは体を素通り→そのまま円外へ
+    verdict('MISS','var(--red)','ボールに触れず');
+    coach(r.reason+'。<b>落下点に先に入って</b>構えましょう。');
+    streak=0;
+    phase='roll';phaseT=performance.now();
+    return;
   }
-  lastVerdict={grade,color};
-  const v=$('verdict');v.textContent=grade;v.style.color=color;
-  v.classList.remove('show');void v.offsetWidth;v.classList.add('show');
-  // ボール挙動: 成功→減速して足元 / 失敗→弾む
-  if(grade==='PERFECT TOUCH'||grade==='GOOD'){ball.vx*=0.1;ball.vy=0.3;ball.vz=0.4;}
-  else{ball.vy=Math.abs(ball.vz)*0.35;ball.vz=Math.abs(ball.vz)*0.5;ball.vx*=1.5;}
-  updateHUD();
-  phase='result';phaseT=performance.now();
+  // トラップ品質→ボールの跳ね返り速度
+  const q=r.q;
+  const speed=0.35+(1-q)*3.4;
+  const az=Math.random()*Math.PI*2;
+  ball.x=zoneToWorldX(); ball.z=CIRCLE.cz+0.1; ball.y=Math.max(R,ball.targetY*0.5);
+  ball.vx=Math.cos(az)*speed*0.8;
+  ball.vz=Math.sin(az)*speed*0.8;
+  ball.vy=q>0.6?0.4:1.3+(1-q);
+  let g,c;
+  if(q>0.78){g='PERFECT';c='var(--volt)';coach('完璧な吸収。ボールが<b>足元に吸い付いた</b>。すぐキック準備!');}
+  else if(q>0.55){g='GOOD';c='var(--teal)';coach('良いタッチ。<b>円内に残るか</b>…!');}
+  else{g='HARD TOUCH';c='var(--amber)';
+    coach(r.dtErr<-120?'<b>早すぎ</b>。ボールが大きく跳ねた!':r.dtErr>120?'<b>遅れた</b>。跳ね返りが強い!':'足が硬い。<b>触る瞬間に脱力</b>を。');}
+  verdict(g,c,'');
+  if(!reduceMotion)burst(project(ball.x,ball.y,ball.z), q>0.78?'#C8FF4D':q>0.55?'#5DD9C1':'#FFB454');
+  showAnalysis(r);
+  phase='roll';phaseT=performance.now();
+}
+function zoneToWorldX(){
+  // ゾーン画面位置→ワールドx（z=CIRCLE.cz+0.1）
+  const zz=CIRCLE.cz+0.1+1.6, s=CAM.f()/zz;
+  return (zoneRect.x*W - W/2)/s;
 }
 
+function onOut(){
+  verdict('OUT','var(--red)','円外 — 0点');
+  coach('コントロールできず円外へ。<b>吸収の質</b>が跳ね返りの強さを決めます。');
+  streak=0;updateHUD();
+  phase='after';phaseT=performance.now();
+}
+function onSettled(){
+  phase='kick';settleT=performance.now();
+  kickDeadline=settleT+3500;
+  coach('<b>KICK!</b> '+(inputMode==='cam'?'ボールの位置で素早く蹴る動きを!':inputMode==='sensor'?'スマホを鋭く振れ!':'今すぐタップ!'));
+  // キック検知ゾーンをボール位置へ移動
+  const p=project(ball.x,ball.y,ball.z);
+  zoneRect={x:Math.min(.92,Math.max(.08,p.sx/W)), y:Math.min(.9,p.sy/H), r:0.1};
+}
+function detectKick(now){
+  if(inputMode==='tap')return false; // pointerdownで処理
+  const m=motionBuf.length?motionBuf[motionBuf.length-1]:null;
+  if(!m)return false;
+  const th=inputMode==='sensor'?14:baseline*2.2+9;
+  return m.zone>th && now-settleT>120;   // 静止直後の残動作を除外
+}
+function onKick(now){
+  kickT=(now-settleT)/1000;
+  const bonus=Math.round(Math.max(5,50-Math.max(0,kickT-0.5)/2.5*45));
+  const trapPts=Math.round(trapResult.q*100);
+  const mult=1+streak*0.08;
+  const pts=Math.round((trapPts+bonus)*mult);
+  score+=pts;streak++;level=Math.min(10,Math.floor(score/400));
+  if(score>best)best=score;
+  verdict('+'+pts,'var(--volt)',`TRAP ${trapPts} + KICK ${bonus}${streak>1?' ×'+mult.toFixed(2):''}`);
+  $('kickTime').textContent=kickT.toFixed(2)+'s'+(kickT<0.8?' ⚡FAST':kickT<1.6?'':' …SLOW');
+  updateHUD();
+  // ボールを蹴り出す
+  ball.vz=7+Math.random()*3;ball.vy=2.5;ball.vx=(Math.random()-0.5)*3;
+  if(!reduceMotion)burst(project(ball.x,ball.y,ball.z),'#C8FF4D');
+  phase='after';phaseT=performance.now();
+}
+function onKickTimeout(){
+  kickT=null;
+  const trapPts=Math.round(trapResult.q*50);  // 遅延ペナルティ: 半分
+  score+=trapPts;streak=0;
+  if(score>best)best=score;
+  verdict('TOO SLOW','var(--amber)',`TRAP ${trapPts}のみ`);
+  coach('キックが遅い! トラップは<b>次のプレーの準備</b>。止めた瞬間に蹴る意識を。');
+  $('kickTime').textContent='TIMEOUT';
+  updateHUD();
+  phase='after';phaseT=performance.now();
+}
+
+function verdict(main,color,sub){
+  const v=$('verdict');
+  v.innerHTML=main+(sub?`<small>${sub}</small>`:'');
+  v.style.color=color;
+  v.classList.remove('show');void v.offsetWidth;v.classList.add('show');
+}
 function updateHUD(){
   $('score').textContent=score;
   $('streak').textContent=streak;
-  $('avg').textContent=history.length?Math.round(history.reduce((a,b)=>a+b,0)/history.length*100)+'%':'–';
+  $('best').textContent=best;
 }
 function coach(html){$('coach').innerHTML=html;}
 
 function showAnalysis(r){
   const a=$('analysis');a.classList.add('show');
-  const set=(b,p,v)=>{$(b).style.width=Math.round(v*100)+'%';$(p).textContent=Math.round(v*100)+'%';};
-  set('bTiming','pTiming',r.timing);set('bCushion','pCushion',r.cushion);set('bSteady','pSteady',r.steady);
-  // 波形描画
+  const set=(b,p,v)=>{
+    if(v==null){$(b).style.width='0%';$(p).textContent='—';return;}
+    $(b).style.width=Math.round(v*100)+'%';$(p).textContent=Math.round(v*100)+'%';
+  };
+  set('bPosture','pPosture',r.posture);
+  set('bPoint','pPoint',r.point);
+  set('bTiming','pTiming',r.timing);
+  set('bCushion','pCushion',r.cushion);
+  $('kickTime').textContent='…';
   const wc=$('wave'),wx=wc.getContext('2d');wx.clearRect(0,0,wc.width,wc.height);
   wx.strokeStyle='rgba(242,245,240,.25)';wx.beginPath();
-  const cx=wc.width/2;wx.moveTo(cx,0);wx.lineTo(cx,wc.height);wx.stroke();  // 接触時刻
-  if(r.wave.length>1){
+  const cx=wc.width/2;wx.moveTo(cx,0);wx.lineTo(cx,wc.height);wx.stroke();
+  if(r.wave&&r.wave.length>1){
     const t0=contactAt-420, span=840;
     const max=Math.max(8,...r.wave.map(m=>m.zone));
     wx.strokeStyle='#C8FF4D';wx.lineWidth=1.6;wx.beginPath();
     r.wave.forEach((m,i)=>{
-      const x=(m.t-t0)/span*wc.width, y=wc.height-4-(m.zone/max)*(wc.height-8);
+      const x=(m.t-t0)/span*wc.width, y=wc.height-3-(m.zone/max)*(wc.height-6);
       i?wx.lineTo(x,y):wx.moveTo(x,y);
     });
     wx.stroke();
-  }else{
-    wx.fillStyle='rgba(242,245,240,.5)';wx.font='10px IBM Plex Mono';
-    wx.fillText('TAP MODE — 波形なし',10,32);
   }
   clearTimeout(showAnalysis.t);
-  showAnalysis.t=setTimeout(()=>a.classList.remove('show'),3400);
+  showAnalysis.t=setTimeout(()=>a.classList.remove('show'),5000);
 }
 
 /* ---------- パーティクル ---------- */
@@ -376,36 +481,55 @@ function burst(p,col){
 }
 
 /* ---------- 描画 ---------- */
+function drawCircle(now){
+  if(!playing)return;
+  const danger=ball&&(phase==='roll')&&planarDist(ball)>CIRCLE.r*0.72;
+  ctx.save();
+  ctx.strokeStyle=danger?'rgba(255,93,93,.95)':'rgba(242,245,240,.8)';
+  ctx.lineWidth=danger?3.5:2.5;
+  ctx.setLineDash([12,8]);ctx.lineDashOffset=-now/40;
+  ctx.beginPath();
+  for(let i=0;i<=48;i++){
+    const a=i/48*Math.PI*2;
+    const p=project(CIRCLE.cx+Math.cos(a)*CIRCLE.r,0,CIRCLE.cz+Math.sin(a)*CIRCLE.r);
+    i?ctx.lineTo(p.sx,p.sy):ctx.moveTo(p.sx,p.sy);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  const lp=project(CIRCLE.cx,0,CIRCLE.cz-CIRCLE.r);
+  ctx.fillStyle=danger?'rgba(255,93,93,.9)':'rgba(242,245,240,.55)';
+  ctx.font='10px IBM Plex Mono';ctx.textAlign='center';
+  ctx.fillText('CONTROL CIRCLE R1.4m',lp.sx,lp.sy+18);
+  ctx.restore();
+}
 function drawZone(now){
-  if(phase!=='flight')return;
+  if(phase!=='flight'&&phase!=='kick')return;
   const p={x:zoneRect.x*W,y:zoneRect.y*H,r:zoneRect.r*Math.min(W,H)*1.15};
-  const remain=Math.max(0,(contactAt-now)/(ball.T*1000));
-  const hot=remain<0.13;
+  const kick=phase==='kick';
+  const remain=kick?Math.max(0,(kickDeadline-now)/3500):Math.max(0,(contactAt-now)/(ball.T*1000));
+  const hot=kick||remain<0.13;
   ctx.save();
   ctx.translate(p.x,p.y);
-  // チョークサークル（署名要素）
   ctx.strokeStyle=hot?'#C8FF4D':'rgba(242,245,240,.85)';
   ctx.lineWidth=hot?4:2.5;
   ctx.setLineDash([10,7]);ctx.lineDashOffset=-now/28;
   ctx.beginPath();ctx.ellipse(0,0,p.r,p.r*0.45,0,0,Math.PI*2);ctx.stroke();
   ctx.setLineDash([]);
-  // カウントダウンリング
-  ctx.strokeStyle=hot?'#C8FF4D':'rgba(200,255,77,.5)';
+  ctx.strokeStyle=kick?'#FFB454':'rgba(200,255,77,.5)';
   ctx.lineWidth=3;
   ctx.beginPath();ctx.ellipse(0,0,p.r*1.18,p.r*0.53,0,-Math.PI/2,-Math.PI/2+(1-remain)*Math.PI*2);ctx.stroke();
-  // 動き検出グロー
   const m=motionBuf.length?motionBuf[motionBuf.length-1].zone:0;
   if(inputMode!=='tap'&&m>baseline*1.5){
     ctx.fillStyle=`rgba(200,255,77,${Math.min(.22,m/160)})`;
     ctx.beginPath();ctx.ellipse(0,0,p.r,p.r*0.45,0,0,Math.PI*2);ctx.fill();
   }
-  ctx.fillStyle='rgba(242,245,240,.75)';ctx.font='10px IBM Plex Mono';ctx.textAlign='center';
-  ctx.fillText(hot?'NOW!':'TRAP ZONE',0,p.r*0.45+16);
+  ctx.fillStyle=kick?'#FFB454':'rgba(242,245,240,.75)';
+  ctx.font=(kick?'bold 14px':'10px')+' IBM Plex Mono';ctx.textAlign='center';
+  ctx.fillText(kick?'KICK!':hot?'NOW!':'TRAP ZONE',0,p.r*0.45+18);
   ctx.restore();
 }
 function drawBall(now){
   if(!ball)return;
-  // 軌跡
   ctx.save();
   for(let i=1;i<ball.trail.length;i++){
     const a=ball.trail[i-1],b=ball.trail[i];
@@ -414,19 +538,16 @@ function drawBall(now){
     ctx.lineWidth=1.5;
     ctx.beginPath();ctx.moveTo(pa.sx,pa.sy);ctx.lineTo(pb.sx,pb.sy);ctx.stroke();
   }
-  // 影
   const sh=project(ball.x,0,ball.z);
   const p=project(ball.x,ball.y,ball.z);
   const r=Math.max(3,R*p.s);
   ctx.fillStyle=`rgba(0,0,0,${Math.max(.08,.4-ball.y*0.18)})`;
   ctx.beginPath();ctx.ellipse(sh.sx,sh.sy,r*0.95,r*0.32,0,0,Math.PI*2);ctx.fill();
-  // ボール本体
   const g=ctx.createRadialGradient(p.sx-r*0.35,p.sy-r*0.4,r*0.1,p.sx,p.sy,r);
   g.addColorStop(0,'#ffffff');g.addColorStop(.75,'#dfe4dc');g.addColorStop(1,'#9aa39a');
   ctx.fillStyle=g;
   ctx.beginPath();ctx.arc(p.sx,p.sy,r,0,Math.PI*2);ctx.fill();
-  // 回転するパネル模様
-  const rot=now/1000*ball.spin*1.8;
+  const rot=now/1000*(ball.spin||3)*1.8;
   ctx.save();ctx.translate(p.sx,p.sy);ctx.rotate(rot);
   ctx.fillStyle='rgba(20,30,24,.85)';
   for(let i=0;i<3;i++){
@@ -459,13 +580,26 @@ function loop(now){
 
   if(phase==='flight'){
     stepBall(ball,dt);
-    if(now>=contactAt){resolveTouch();}
-  }else if(phase==='result'){
-    stepBall(ball,dt);
-    if(now-phaseT>1500){phase='wait';phaseT=now;}
-  }else if(phase==='wait'){
-    if(now-phaseT>700){serve();}
+    if(now>=contactAt)resolveTrap();
   }
+  else if(phase==='roll'){
+    stepBall(ball,dt);
+    if(planarDist(ball)>CIRCLE.r){onOut();}
+    else if(ballSpeed(ball)<0.35 && ball.y<=R+0.03){onSettled();}
+    else if(now-phaseT>4000){onSettled();}  // 保険
+  }
+  else if(phase==='kick'){
+    if(detectKick(now))onKick(now);
+    else if(now>kickDeadline)onKickTimeout();
+  }
+  else if(phase==='after'){
+    stepBall(ball,dt);
+    if(now-phaseT>1600){phase='wait';phaseT=now;}
+  }
+  else if(phase==='wait'){
+    if(now-phaseT>800)serve();
+  }
+  drawCircle(now);
   drawZone(now);
   drawBall(now);
   drawParticles(dt);
@@ -475,7 +609,7 @@ requestAnimationFrame(loop);
 /* ---------- 起動 ---------- */
 async function startCam(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-    coach('この環境ではカメラAPIが使えません（プレビュー内の制限）。<b>センサーモード</b>で開始します。');
+    coach('この環境ではカメラAPIが使えません。<b>センサーモード</b>で開始します。');
     return startSensor();
   }
   try{
@@ -483,22 +617,20 @@ async function startCam(){
     video.srcObject=s;await video.play();
     camReady=true;inputMode='cam';
     begin();
-    // ベースライン計測
     setTimeout(()=>{
       const recent=motionBuf.slice(-20);
       baseline=Math.max(2,recent.reduce((a,m)=>a+m.zone,0)/(recent.length||1));
+      baseLower=Math.max(0.5,recent.reduce((a,m)=>a+m.lower,0)/(recent.length||1));
     },1800);
   }catch(e){
-    coach('カメラを起動できませんでした（'+(e.name||'blocked')+'）。<b>センサーモード</b>で開始します。ダウンロードしてブラウザで開くとカメラが使える場合があります。');
+    coach('カメラを起動できませんでした（'+(e.name||'blocked')+'）。<b>センサーモード</b>で開始します。');
     startSensor();
   }
 }
-
-/* スマホ加速度センサー: 「引く」動きを運動信号として同じ採点パイプラインに流す */
 async function startSensor(){
   try{
     if(typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission==='function'){
-      const st=await DeviceMotionEvent.requestPermission();   // iOSは明示許可が必要
+      const st=await DeviceMotionEvent.requestPermission();
       if(st!=='granted')throw new Error('denied');
     }
     if(typeof DeviceMotionEvent==='undefined')throw new Error('unsupported');
@@ -515,8 +647,8 @@ async function startSensor(){
       got=true;
       const zone=Math.min(100,mag);
       const now=performance.now();
-      motionBuf.push({t:now,zone,total:zone});
-      while(motionBuf.length&&now-motionBuf[0].t>1600)motionBuf.shift();
+      motionBuf.push({t:now,zone,cx:0,cy:0,lower:0});
+      while(motionBuf.length&&now-motionBuf[0].t>2000)motionBuf.shift();
       $('meterFill').style.height=Math.min(100,zone*2.2)+'%';
     });
     inputMode='sensor';camReady=false;baseline=1.5;
@@ -534,7 +666,6 @@ async function startSensor(){
     startTap();
   }
 }
-
 function startTap(){
   inputMode='tap';camReady=false;
   video.classList.add('hidden');
@@ -543,10 +674,10 @@ function startTap(){
 }
 function begin(){
   $('startOverlay').classList.add('hidden');
-  playing=true;score=0;streak=0;history=[];level=0;updateHUD();
-  coach(inputMode==='cam'?'準備OK。最初のボールが来ます。'
-    :inputMode==='sensor'?'スマホを利き足だと思って構え、<b>接触の瞬間にスッと手前へ引く</b>＝トラップ。強く振ると「HARD TOUCH」になります。'
-    :'<b>接触の瞬間に押して</b>、約0.2秒ホールドしてから離す＝吸収。');
+  playing=true;score=0;streak=0;level=0;updateHUD();
+  coach(inputMode==='cam'?'準備OK。<b>斜め45°</b>のカメラ位置を確認して。最初のボールが来ます。'
+    :inputMode==='sensor'?'スマホ＝利き足。<b>接触の瞬間に引いて</b>吸収、KICK!の合図で<b>鋭く振る</b>。'
+    :'<b>接触の瞬間にタップ→0.2秒ホールドで吸収</b>。KICK!の合図で即タップ。');
   phase='wait';phaseT=performance.now()-200;
 }
 $('btnCam').onclick=startCam;
@@ -555,8 +686,9 @@ $('btnTouch').onclick=startTap;
 
 /* タップモード入力 */
 addEventListener('pointerdown',e=>{
-  if(!playing||inputMode!=='tap'||phase!=='flight')return;
-  tapDown=performance.now();tapUp=null;
+  if(!playing||inputMode!=='tap')return;
+  if(phase==='flight'){tapDown=performance.now();tapUp=null;}
+  else if(phase==='kick'){onKick(performance.now());}
 });
 addEventListener('pointerup',e=>{
   if(!playing||inputMode!=='tap')return;
