@@ -492,7 +492,7 @@
     <div class="ball-legend">
       <div class="bl-title">SCORING — 判定5要素</div>
       <div class="bl-row"><span class="bl-dot" style="background:#1FE0D8"></span><b>①姿勢/構え</b> 膝の屈曲とボールラインへの寄せ</div>
-      <div class="bl-row"><span class="bl-dot" style="background:#2E8FFF"></span><b>②ポイント</b> 指定部位でボールを捉えたか</div>
+      <div class="bl-row"><span class="bl-dot" style="background:#2E8FFF"></span><b>②ポイント</b> 体の正しい面でボールを捉えたか</div>
       <div class="bl-row"><span class="bl-dot" style="background:#7CFC9A"></span><b>③タイミング</b> 接触の瞬間に動きのピークが合ったか</div>
       <div class="bl-row"><span class="bl-dot" style="background:#FFC53D"></span><b>④吸収</b> 引き足でボールの勢いを殺せたか → 弱いと円外でOUT</div>
       <div class="bl-row"><span class="bl-dot" style="background:#FF9F43"></span><b>⑤キック速度</b> 止めてから蹴るまでの反応時間</div>
@@ -580,7 +580,7 @@
 /* =========================================================================
  * TRAP CONTROL CHALLENGE — VOLLEYSHOOT CHALLENGE シリーズ第2弾
  * 骨格検出: MediaPipe Tasks Vision PoseLandmarker (端末内で動作)
- * ルール: 逆サイドから飛来するボールを指定部位でトラップ。
+ * ルール: 逆サイドから飛来するボールを自由な部位でトラップ。
  *         コントロールサークルの外に出したらOUT。止めたら即キック。
  * 判定5要素: ①姿勢/構え ②ポイント ③タイミング ④吸収 ⑤キック速度
  * ========================================================================= */
@@ -604,7 +604,6 @@ const PARTS = {
   THIGH: { label: "モモ",   color: "#7CFC9A" },
   CHEST: { label: "胸",     color: "#FFC53D" },
 };
-const PART_WEIGHTS = [["FOOT", 0.5], ["THIGH", 0.3], ["CHEST", 0.2]];
 // タッチ部位(足トラップ時の6分類) — シリーズ共通の足軸判定
 const TOUCH_TYPES = {
   INSTEP:   { label: "インステップ" },
@@ -685,7 +684,6 @@ let lastHitAt = 0;
 let lastResultSummary = null;
 
 // 1球の状態
-let requiredPart = "FOOT";
 let contactAt = 0;
 let trapResult = null;
 let settleAt = 0, kickDeadline = 0;
@@ -1024,12 +1022,6 @@ function partCandidates(entry, part) {
   if (part === "THIGH") return [entry.thighL, entry.thighR].filter(Boolean);
   return [entry.footL, entry.footR].filter(Boolean);
 }
-function pickRequiredPart() {
-  const r = Math.random();
-  let acc = 0;
-  for (const [k, w] of PART_WEIGHTS) { acc += w; if (r < acc) return k; }
-  return "FOOT";
-}
 
 /* ---------------- タッチ部位6分類(シリーズ共通の足軸判定) ---------------- */
 function classifyTouch(ballPt, foot, side) {
@@ -1081,33 +1073,21 @@ function serve(nowMs) {
   const dir = hipX < W / 2 ? -1 : 1;              // -1: 右→左へ飛ぶ, 1: 左→右へ飛ぶ
   const startX = dir === -1 ? W + 60 * DPR() : -60 * DPR();
 
-  // 指定部位: 実際に検出した部位の座標を狙う
-  requiredPart = pickRequiredPart();
-  const cands = partCandidates(poseBuf[poseBuf.length - 1] || {}, requiredPart);
-  let tx, ty;
-  if (cands.length) {
-    const p = cands[Math.floor(Math.random() * cands.length)];
-    tx = p.x - dir * (0.08 + Math.random() * 0.22) * bodyH;  // 進入側に少しリード
-    ty = p.y + (Math.random() - 0.5) * 0.06 * bodyH;
-  } else {
-    const zone = { FOOT: 0.06, THIGH: 0.38, CHEST: 0.72 }[requiredPart];
-    tx = hipX - dir * 0.15 * bodyH;
-    ty = ground - bodyH * zone;
-  }
+  // 部位指定なし: 高さ・速さ・角度は自由。地面〜胸下(0〜1.25m)の任意の高さへ
+  const P = ppm();
+  const hTarget = Math.random() < 0.4 ? 0 : Math.random() * 1.25;
+  let tx = hipX - dir * (0.1 + Math.random() * 0.3) * bodyH;   // 進入側に少しリード
   tx = Math.max(W * 0.08, Math.min(W * 0.92, tx));
-  ty = Math.max(H * 0.15, Math.min(ground - 4, ty));
+  const r = Math.max(10, bodyH * 0.075);
+  let ty = Math.max(H * 0.15, ground - r - hTarget * P);
 
-  // 球種: 部位に合う物理的な軌道を選ぶ
-  const type = requiredPart === "FOOT" ? (Math.random() < 0.55 ? "ground" : "driven")
-             : requiredPart === "THIGH" ? (Math.random() < 0.6 ? "driven" : "loft")
-             : (Math.random() < 0.7 ? "loft" : "driven");
-  const baseT = type === "loft" ? 1.7 + Math.random() * 0.6      // ロブ: 高い弧
-             : type === "driven" ? 0.95 + Math.random() * 0.35   // ライナー: 低く速い
-             : 1.3 + Math.random() * 0.5;                        // グラウンダー
+  // 球種と滞空時間(物理的な軌道)
+  const type = hTarget < 0.08 ? "ground" : (Math.random() < 0.55 ? "driven" : "loft");
+  const baseT = type === "loft" ? 1.5 + Math.random() * 0.5      // チップ気味の浮き球
+             : type === "driven" ? 0.9 + Math.random() * 0.4     // ライナー: 低く速い
+             : 1.2 + Math.random() * 0.6;                        // グラウンダー
   let T = Math.max(0.7, baseT * cfg.timeScale);
   const g = gAccel();
-  const P = ppm();
-  const r = Math.max(10, bodyH * 0.075);
 
   if (type === "ground") {
     // 転がり: 摩擦減速 a のもとで T 秒後に目標へ届く初速を厳密に解く
@@ -1118,15 +1098,15 @@ function serve(nowMs) {
     ball = { x: startX, y: ground - r, vx: v0, vy: 0, ax: -Math.sign(v0) * a,
              r, tx, ty, ground, type, rot: 0, trail: [] };
   } else {
-    // 弾道: 実重力での放物線 y(T)=sy+vy0·T+½gT²=ty (画面yは下向き正)。
-    // 頂点が画面上端を超える場合は滞空を短縮して物理的に整合させる
-    const sy = ground - r;                               // 地上からの蹴り出し
+    // 弾道: 実重力の放物線。頂点は「目標の1.4m上」まで(画面から消えず読める軌道)
+    const sy = ground - r;
+    const maxApexY = Math.max(H * 0.08, ty - 1.4 * P);
     let vy0 = 0;
-    for (let i = 0; i < 7; i++) {
-      vy0 = (ty - sy) / T - 0.5 * g * T;
+    for (let i = 0; i < 8; i++) {
+      vy0 = (ty - sy) / T - 0.5 * g * T;                 // y(T)=sy+vy0T+½gT²=ty
       const apexY = vy0 < 0 ? sy - (vy0 * vy0) / (2 * g) : sy;
-      if (apexY > H * 0.05 || T <= 0.75) break;
-      T *= 0.85;
+      if (apexY >= maxApexY || T <= 0.7) break;
+      T *= 0.87;                                          // 弧が高すぎる→滞空短縮
     }
     ball = { x: startX, y: sy, vx: (tx - startX) / T, vy: vy0,
              r, tx, ty, ground, type, rot: 0, trail: [] };
@@ -1135,7 +1115,6 @@ function serve(nowMs) {
   trapResult = null;
   sub = "flight";
   playBeep(660, 0.07, 0.1);
-  addPopup(tx, ty - bodyH * 0.18, `${PARTS[requiredPart].label}でトラップ!`, PARTS[requiredPart].color, 1400);
 }
 
 /* ---------------- ボール物理 ---------------- */
@@ -1190,17 +1169,22 @@ function judgeTrap(contactT) {
   const win = poseBuf.filter((e) => Math.abs(e.t - contactT) <= 460);
   if (win.length < 4) return { miss: true, reason: "骨格を検出できませんでした" };
 
+  // 部位指定なし: 足・モモ・胸の全候補から、ボールに最も近い部位で判定
   const series = [];
   for (const e of win) {
-    const cands = partCandidates(e, requiredPart);
-    if (!cands.length) continue;
-    let best = cands[0], bd = 1e9;
-    for (const c of cands) { const d = Math.hypot(c.x - bp.x, c.y - bp.y); if (d < bd) { bd = d; best = c; } }
-    series.push({ t: e.t, p: best, dist: bd, speed: best.speed || 0, knee: e.knee, hipX: e.hipX });
+    let best = null, bestPart = null, bd = 1e9;
+    for (const part of ["FOOT", "THIGH", "CHEST"]) {
+      for (const c of partCandidates(e, part)) {
+        const d = Math.hypot(c.x - bp.x, c.y - bp.y);
+        if (d < bd) { bd = d; best = c; bestPart = part; }
+      }
+    }
+    if (!best) continue;
+    series.push({ t: e.t, p: best, part: bestPart, dist: bd, speed: best.speed || 0, knee: e.knee, hipX: e.hipX });
   }
-  if (series.length < 4) return { miss: true, reason: `${PARTS[requiredPart].label}を検出できませんでした` };
+  if (series.length < 4) return { miss: true, reason: "骨格を検出できませんでした" };
   const minDist = Math.min(...series.map((s) => s.dist));
-  if (minDist > hitR * 2.1) return { miss: true, reason: `${PARTS[requiredPart].label}がボールに届いていません`, wave: series };
+  if (minDist > hitR * 2.1) return { miss: true, reason: "体がボールに届いていません", wave: series };
 
   // ③タイミング: 部位速度のピーク vs 接触時刻
   let peak = 0, peakT = contactT;
@@ -1236,9 +1220,9 @@ function judgeTrap(contactT) {
       : worst === stanceScore ? "スタンスは肩幅より少し広く"
       : "上体がブレています — 頭を安定させて";
   }
-  // 足トラップ時: タッチ部位6分類
-  let touchLabel = PARTS[requiredPart].label;
-  if (requiredPart === "FOOT") {
+  // 使用部位: 接触時に最も近かった部位を報告(足なら6分類)
+  let touchLabel = PARTS[cE.part] ? PARTS[cE.part].label : "—";
+  if (cE.part === "FOOT") {
     const fl = feet.left, fr = feet.right;
     let foot = null, side = "L";
     if (fl && fr) { foot = (Math.hypot(fl.x - bp.x, fl.y - bp.y) < Math.hypot(fr.x - bp.x, fr.y - bp.y)) ? fl : fr; side = foot === fl ? "L" : "R"; }
@@ -1262,14 +1246,16 @@ function resolveTrap(nowMs) {
     sub = "roll";     // 素通り→そのまま円外へ
     return;
   }
-  // トラップ品質→跳ね返り(物理: 吸収できなかった運動量が残る)
+  // トラップ品質→跳ね返り(物理: 出射速度は入射速度を超えない)
   const q = r.q;
   trapQs.push(q);
-  const P = ppm();
-  const speed = P * (0.4 + (1 - q) * 4.2);        // 0.4〜4.6 m/s
-  const dirOut = Math.random() < 0.5 ? -1 : 1;
-  ball.vx = dirOut * speed * (0.6 + Math.random() * 0.4);
-  ball.vy = -P * ((1 - q) * 2.0 + 0.2);           // 硬いタッチほど跳ね上がる(最大≒2.2m/s)
+  const vIn = Math.hypot(ball.vx, ball.vy);              // 接触直前の実速度
+  const residual = Math.min(0.8, 0.06 + (1 - q) * 0.7);  // 完璧な吸収≒6%まで殺す
+  const vOut = vIn * residual;
+  const back = Math.random() < 0.75 ? -Math.sign(ball.vx || 1) : Math.sign(ball.vx || 1);
+  const th = (15 + Math.random() * 40) * Math.PI / 180;  // 跳ね上がり角15〜55°
+  ball.vx = back * vOut * Math.cos(th);
+  ball.vy = -vOut * Math.sin(th);
   let grade, color;
   if (q > 0.78) { grade = "PERFECT TOUCH"; color = "#FFC53D"; playBeep(1100, 0.14, 0.22); }
   else if (q > 0.55) { grade = "GOOD"; color = "#1FE0D8"; playBeep(880, 0.1); }
@@ -1370,7 +1356,7 @@ function showAnalysisCard(r, kick) {
   set("an-point", "an-point-p", rr.point);
   set("an-timing", "an-timing-p", rr.timing);
   set("an-cushion", "an-cushion-p", rr.cushion);
-  $("an-touch").textContent = r && r.miss ? "MISS — " + (r.reason || "") : "タッチ: " + (rr.touchLabel || "—");
+  $("an-touch").textContent = r && r.miss ? "MISS — " + (r.reason || "") : "使用部位: " + (rr.touchLabel || "—");
   $("an-kick").textContent = !kick ? "—" : kick.t == null ? "TIMEOUT" : kick.t.toFixed(2) + "s" + (kick.perfect ? " ⚡" : "");
   $("an-note").textContent = r && !r.miss ? ("姿勢: " + (r.postureNote || "")) : "落下点に先に入って構えましょう";
   // 波形(部位速度)
@@ -1518,23 +1504,6 @@ function drawPostureLive(nowMs) {
   ctx.shadowColor = "rgba(0,0,0,.7)"; ctx.shadowBlur = 6 * DPR();
   ctx.fillText(ok ? "構えOK" : !alignOK ? "ボールの正面へ!" : "膝を曲げて!", circleCx, gy);
   ctx.restore();
-}
-function drawRequiredPart(nowMs) {
-  if (phase !== "playing" || sub !== "flight") return;
-  const e = poseBuf[poseBuf.length - 1];
-  if (!e) return;
-  const cands = partCandidates(e, requiredPart);
-  const col = PARTS[requiredPart].color;
-  for (const p of cands) {
-    const r = ((anchorBodyH || 300) * 0.1) + Math.sin(nowMs / 120) * 3 * DPR();
-    ctx.save();
-    ctx.strokeStyle = col;
-    ctx.lineWidth = 2.5 * DPR();
-    ctx.setLineDash([6 * DPR(), 5 * DPR()]);
-    ctx.lineDashOffset = -nowMs / 30;
-    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
-  }
 }
 function drawKickPrompt(nowMs) {
   if (sub !== "kick" || !ball) return;
@@ -1921,7 +1890,6 @@ function loop(nowMs) {
   drawSkeleton();
   drawCircle(nowMs);
   drawBall(nowMs);
-  drawRequiredPart(nowMs);
   drawPostureLive(nowMs);
   drawKickPrompt(nowMs);
   drawFoot(feet.left, nowMs);
