@@ -125,10 +125,9 @@
 
   <div id="hud">
     <div class="scoreboard">
-      <div class="cell"><div class="lbl">SCORE</div><div class="val volt" id="score">0</div></div>
-      <div class="cell"><div class="lbl">BALL</div><div class="val" id="ballNo">–</div></div>
-      <div class="cell"><div class="lbl">STREAK</div><div class="val" id="streak">0</div></div>
-      <div class="cell"><div class="lbl">BEST</div><div class="val" id="best">0</div></div>
+      <div class="cell"><div class="lbl">スコア</div><div class="val volt" id="score">0</div></div>
+      <div class="cell"><div class="lbl">タイム</div><div class="val" id="timeVal">0:00</div></div>
+      <div class="cell"><div class="lbl">成功 / 回</div><div class="val" id="succ">0/0</div></div>
     </div>
     <div id="coach">モードを選んで開始してください。</div>
   </div>
@@ -182,8 +181,8 @@
 
       <div class="rulebox">
         <b>FLOW</b> 正しい位置に立つ → AI が骨格を検知 → <b>カウント3</b>でスタート<br>
-        <b>RULE</b> トラップしたボールが<b>コントロールサークル</b>（半径1.4m）の外に出たら OUT。止めたら即キック — 速いほどボーナス。<br>
-        <b>CAM</b> 斜め前45°・距離2.5〜3m・高さ約1m。足元〜頭が映る画角。
+        <b>RULE</b> ボールは<b>画面の左右から</b>飛来。トラップしたボールが<b>コントロールサークル</b>（半径1.4m）の外に出たら OUT。止めたら即キック — 速いほどボーナス。<br>
+        <b>CAM</b> カメラは<b>プレイヤーの後方2.5〜3m</b>（背中越し視点）・高さ約1m。全身が映る画角に。横からの動きが最もよく分析できます。
       </div>
 
       <div class="btnrow">
@@ -270,19 +269,21 @@ const CIRCLE={cx:0, cz:0.8, r:1.4};
 const G=9.81, RHO=1.2, R=0.11, A=Math.PI*R*R, M=0.43, CD=0.25, CL=0.20;
 function makeServe(level,aimSx){
   const type=['ground','driven','loft'][Math.floor(Math.random()*3)];
-  const z0=16+Math.random()*4;
+  const side=Math.random()<0.5?-1:1;          // 1=画面右から, -1=画面左から
+  const x0=side*7.5;                          // 画面外の横から進入
   let targetX;
-  if(aimSx!=null){ // プレイヤー骨格位置基準 ±0.3〜0.9m
-    targetX=unprojectX(aimSx,CIRCLE.cz+0.1)+(Math.random()<0.5?-1:1)*(0.3+Math.random()*0.6);
+  if(aimSx!=null){ // プレイヤー骨格位置の少し手前(進入側)で触れる位置へ
+    targetX=unprojectX(aimSx,CIRCLE.cz+0.1)+side*(0.15+Math.random()*0.35);
   }else{
-    targetX=(Math.random()*2-1)*Math.min(1.0,W/1000);
+    targetX=(Math.random()*2-1)*0.4;
   }
-  targetX=Math.max(-1.2,Math.min(1.2,targetX));
+  targetX=Math.max(-1.1,Math.min(1.1,targetX));
   const T=Math.max(1.25,(gameMode==='practice'?2.5:2.1)-level*0.08);
-  const b={x:targetX*0.3, y:0.3, z:z0, type, spin:(Math.random()*2-1)*6, trail:[], bounced:0};
+  const b={x:x0, y:0.3, z:CIRCLE.cz+0.2+Math.random()*0.6, type,
+    spin:(Math.random()*2-1)*6, trail:[], bounced:0, side, targetX};
   b.targetY = type==='ground'?0.15 : type==='driven'? 0.5+Math.random()*0.3 : 1.05+Math.random()*0.25;
-  b.vz=-(z0-CIRCLE.cz)/T*1.12;
-  b.vx=(targetX-b.x)/T;
+  b.vx=(targetX-x0)/T*1.12;
+  b.vz=((CIRCLE.cz+0.1)-b.z)/T;
   b.vy=(b.targetY-b.y)/T + 0.5*G*T*(type==='loft'?0.95:type==='driven'?0.55:0.25);
   if(type==='ground'){b.y=0.12;b.vy=0.4;}
   b.T=T;
@@ -542,6 +543,7 @@ let zoneRect={x:.5,y:.7,r:.11};
 let particles=[];
 let ballNum=0; const CHALLENGE_BALLS=10;
 let sessionTrapQs=[],sessionKickTs=[],sessionOuts=0;
+let sessionSuccess=0, sessionStart=0, lastTimeUpd=0;
 let posOkSince=null, cdEnd=0, cdLast=4;
 
 function serve(){
@@ -549,13 +551,14 @@ function serve(){
   const aimSx=(inputMode==='cam'&&lastPose&&lastPose.present)?(lastPose.pts.lh.x+lastPose.pts.rh.x)/2:null;
   ball=makeServe(level,aimSx);
   phase='flight';
-  const p=project(ball.x+ball.vx*ball.T, ball.targetY, CIRCLE.cz+0.1);
+  const p=project(ball.targetX, ball.targetY, CIRCLE.cz+0.1);
   zoneRect={x:Math.min(.92,Math.max(.08,p.sx/W)), y:Math.min(.88,p.sy/H), r:0.11};
   contactAt=performance.now()+ball.T*1000;
   tapDown=tapUp=null;trapResult=null;kickT=null;
   $('btnReplay').classList.remove('show');
   const part=ball.targetY>0.95?'胸':ball.targetY>0.42?'腿':'インサイド';
-  coach(`BALL ${gameMode==='challenge'?ballNum+'/'+CHALLENGE_BALLS:ballNum} — <b>${part}</b>でトラップ!`);
+  const dir=ball.side>0?'画面右':'画面左';
+  coach(`BALL ${gameMode==='challenge'?ballNum+'/'+CHALLENGE_BALLS:ballNum} — <b>${dir}</b>から! <b>${part}</b>でトラップ!`);
   updateHUD();
   beep(660,0.07,0.08);
 }
@@ -599,6 +602,7 @@ function onOut(){
 function onSettled(){
   phase='kick';settleT=performance.now();
   kickDeadline=settleT+3500;
+  sessionSuccess++;updateHUD();
   coach('<b>KICK!</b> '+(inputMode==='cam'?'素早く蹴る動きを!':inputMode==='sensor'?'スマホを鋭く振れ!':'今すぐタップ!'));
   const p=project(ball.x,ball.y,ball.z);
   zoneRect={x:Math.min(.92,Math.max(.08,p.sx/W)), y:Math.min(.9,p.sy/H), r:0.1};
@@ -653,9 +657,10 @@ function showResult(){
   const avgQ=sessionTrapQs.length?sessionTrapQs.reduce((a,b)=>a+b,0)/sessionTrapQs.length:0;
   const avgK=sessionKickTs.length?sessionKickTs.reduce((a,b)=>a+b,0)/sessionKickTs.length:3.5;
   const rank=score>=1200?'S':score>=900?'A':score>=550?'B':'C';
+  const totalT=(performance.now()-sessionStart)/1000;
   $('rRank').textContent=rank;
   $('rScore').textContent=score+' pts';
-  $('rBest').textContent='BEST '+best;
+  $('rBest').textContent='BEST '+best+' ・ TIME '+Math.floor(totalT/60)+':'+String(Math.floor(totalT%60)).padStart(2,'0')+' ・ 成功 '+sessionSuccess+'/'+CHALLENGE_BALLS;
   $('rTrapBar').style.width=Math.round(avgQ*100)+'%';$('rTrapPct').textContent=Math.round(avgQ*100)+'%';
   const kScore=Math.max(0,1-(avgK-0.5)/3);
   $('rKickBar').style.width=Math.round(kScore*100)+'%';$('rKickPct').textContent=avgK.toFixed(2)+'s';
@@ -672,9 +677,7 @@ function verdict(main,color,sub){
 }
 function updateHUD(){
   $('score').textContent=score;
-  $('streak').textContent=streak;
-  $('best').textContent=best;
-  $('ballNo').textContent=gameMode==='challenge'?ballNum+'/'+CHALLENGE_BALLS:(ballNum||'∞');
+  $('succ').textContent=sessionSuccess+'/'+(gameMode==='challenge'?CHALLENGE_BALLS:Math.max(ballNum,0));
 }
 function coach(html){$('coach').innerHTML=html;}
 function showAnalysis(r){
@@ -850,6 +853,7 @@ function tickCountdown(now){
   if(remain<=0){
     $('countdown').classList.remove('show');
     state='play';playing=true;
+    sessionStart=now;
     phase='wait';phaseT=now-400;
     beep(1320,0.18);
     coach('<b>GO!</b>');
@@ -869,6 +873,12 @@ function loop(now){
   if(state==='positioning'){checkPosition(now);return;}
   if(state==='countdown'){tickCountdown(now);return;}
   if(state!=='play')return;
+
+  if(now-lastTimeUpd>250){
+    lastTimeUpd=now;
+    const el=Math.max(0,(now-sessionStart)/1000);
+    $('timeVal').textContent=Math.floor(el/60)+':'+String(Math.floor(el%60)).padStart(2,'0');
+  }
 
   if(phase==='flight'){
     stepBall(ball,dt);
@@ -918,7 +928,7 @@ async function startCamFlow(){
     if(!poseReady)await loadPoseModel();
     resetSession();
     state='positioning';posOkSince=null;
-    coach('<b>斜め前45°・2.5〜3m</b>の位置へ。枠内に全身が入ると自動でカウント開始。');
+    coach('カメラを<b>背中側2.5〜3m</b>に置き、枠内に全身が入ると自動でカウント開始。');
   }catch(e){
     coach('カメラ/AIモデルを起動できませんでした（'+(e.name||e.message||'blocked')+'）。<b>センサーモード</b>に切り替えます。');
     inputMode='sensor';startSensorFlow();
@@ -974,6 +984,8 @@ function hideVideo(){
 function resetSession(){
   score=0;streak=0;level=0;ballNum=0;
   sessionTrapQs=[];sessionKickTs=[];sessionOuts=0;
+  sessionSuccess=0;sessionStart=performance.now();
+  $('timeVal').textContent='0:00';
   lastClip=null;$('btnReplay').classList.remove('show');
   updateHUD();
 }
