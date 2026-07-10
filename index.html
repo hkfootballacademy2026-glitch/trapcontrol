@@ -1,1041 +1,1930 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0B1026" />
 <title>トラップコントロールチャレンジ | TRAP CONTROL CHALLENGE</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=M+PLUS+1:wght@500;700;800;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet" />
 <style>
-  :root{
-    --pitch:#0B1F16; --chalk:#F2F5F0; --volt:#C8FF4D;
-    --teal:#5DD9C1; --amber:#FFB454; --red:#FF5D5D;
-    --ink:rgba(6,16,11,.78);
-    --display:'Anton', sans-serif; --mono:'IBM Plex Mono', monospace;
-    --body:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  :root {
+    --navy: #07090F;
+    --navy2: #0D1220;
+    --navy-glass: rgba(7, 9, 15, 0.82);
+    --white: #F2F5FA;
+    --mute: #8892A6;
+    --cyan: #1FE0D8;
+    --cyan2: #2E8FFF;
+    --gold: #FFC53D;
+    --green: #7CFC9A;
+    --red: #FF4757;
+    --line: rgba(242,245,250,.10);
+    --hud-font: 'Bungee', 'M PLUS 1', sans-serif;
+    --body-font: 'M PLUS 1', sans-serif;
+    --accent-font: 'Rajdhani', 'M PLUS 1', sans-serif;
   }
-  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%;overflow:hidden;background:var(--pitch);color:var(--chalk);font-family:var(--body)}
-  #stage{position:fixed;inset:0}
-  video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:saturate(.92) contrast(1.04)}
-  #vignette{position:absolute;inset:0;pointer-events:none;
-    background:radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(6,16,11,.55) 100%)}
-  canvas#game{position:absolute;inset:0;width:100%;height:100%}
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #000;
+    color: var(--white);
+    font-family: var(--body-font);
+    touch-action: none;
+    overscroll-behavior: none;
+  }
+  #stage { position: fixed; inset: 0; }
+  #video {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    background: #000;
+  }
+  #video.mirrored { transform: scaleX(-1); }
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-  #hud{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between}
-  .scoreboard{display:flex;gap:1px;margin:14px auto 0;background:rgba(242,245,240,.14);
-    border:1px solid rgba(242,245,240,.25);backdrop-filter:blur(6px)}
-  .cell{background:var(--ink);padding:7px 14px 9px;text-align:center;min-width:70px}
-  .cell .lbl{font-family:var(--mono);font-size:9px;letter-spacing:.16em;opacity:.65}
-  .cell .val{font-family:var(--display);font-size:26px;line-height:1.05;letter-spacing:.02em}
-  .cell .val.volt{color:var(--volt)}
-  #coach{margin:0 auto 22px;max-width:min(560px,88vw);background:var(--ink);
-    border-left:3px solid var(--volt);padding:10px 16px;font-size:14px;line-height:1.6;backdrop-filter:blur(6px)}
-  #coach b{color:var(--volt)}
-  #meter{position:absolute;left:14px;bottom:22px;width:10px;height:130px;
-    border:1px solid rgba(242,245,240,.3);background:rgba(6,16,11,.5)}
-  #meterFill{position:absolute;bottom:0;left:0;right:0;height:0%;background:var(--volt);transition:height .08s}
-  #meterLbl{position:absolute;left:30px;bottom:22px;font-family:var(--mono);font-size:10px;letter-spacing:.15em;opacity:.6;writing-mode:vertical-rl}
-  #poseBadge{position:absolute;top:14px;left:14px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
-    padding:5px 9px;background:var(--ink);border:1px solid rgba(242,245,240,.25);opacity:.9}
-  #poseBadge i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:6px;vertical-align:1px}
-  #poseBadge.on i{background:var(--volt)}
+  /* ===== 共通オーバーレイ ===== */
+  .screen {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 16px;
+    overflow-y: auto;
+    padding: max(20px, env(safe-area-inset-top)) 24px max(28px, env(safe-area-inset-bottom));
+    background:
+      radial-gradient(140% 70% at 50% -15%, rgba(31,224,216,0.10), transparent 55%),
+      radial-gradient(120% 60% at 85% 110%, rgba(46,143,255,0.08), transparent 55%),
+      linear-gradient(180deg, #05070C 0%, #0A0E17 55%, #05070C 100%);
+    text-align: center;
+    z-index: 20;
+    transition: opacity .25s ease;
+  }
+  .screen::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: -1;
+    background-image:
+      linear-gradient(rgba(242,245,250,.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(242,245,250,.035) 1px, transparent 1px);
+    background-size: 34px 34px;
+    mask-image: radial-gradient(120% 70% at 50% 0%, #000 40%, transparent 85%);
+  }
+  .screen.hidden { opacity: 0; pointer-events: none; }
 
-  #verdict{position:absolute;left:50%;top:32%;transform:translate(-50%,-50%) scale(.6);
-    font-family:var(--display);font-size:clamp(44px,11vw,88px);letter-spacing:.03em;
-    opacity:0;pointer-events:none;text-shadow:0 4px 30px rgba(0,0,0,.6);text-align:center;line-height:1;z-index:5}
-  #verdict small{display:block;font-family:var(--mono);font-size:clamp(12px,3vw,16px);letter-spacing:.2em;margin-top:6px}
-  #verdict.show{animation:pop 1.1s ease-out forwards}
-  @keyframes pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}
-    12%{opacity:1;transform:translate(-50%,-50%) scale(1.06)}
-    30%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}
-    100%{opacity:0;transform:translate(-50%,-52%) scale(1)}}
+  .eyebrow {
+    font-family: var(--accent-font); font-weight: 700;
+    font-size: 12px; letter-spacing: .42em;
+    color: var(--cyan);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::before, .eyebrow::after { content: ""; width: 22px; height: 1px; background: linear-gradient(90deg, transparent, var(--cyan)); }
+  .eyebrow::after { background: linear-gradient(90deg, var(--cyan), transparent); }
+  h1.title {
+    font-family: var(--body-font); font-weight: 900;
+    font-size: clamp(28px, 8.5vw, 50px);
+    letter-spacing: -.01em;
+    line-height: 1.08;
+    color: var(--white);
+  }
+  h1.title .gold {
+    color: transparent;
+    background: linear-gradient(120deg, var(--cyan), var(--cyan2));
+    -webkit-background-clip: text; background-clip: text;
+  }
+  .subtitle { font-weight: 500; font-size: 13.5px; color: var(--mute); max-width: 420px; line-height: 1.75; }
 
-  #countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
-    pointer-events:none;z-index:6}
-  #countdown.show{display:flex}
-  #cdNum{font-family:var(--display);font-size:clamp(120px,32vw,260px);color:var(--volt);
-    text-shadow:0 0 60px rgba(200,255,77,.35)}
+  .btn {
+    font-family: var(--accent-font); font-weight: 700;
+    font-size: 17px; letter-spacing: .04em;
+    color: var(--navy);
+    background: linear-gradient(120deg, var(--cyan) 0%, var(--cyan2) 100%);
+    border: none; border-radius: 10px;
+    padding: 15px 42px;
+    cursor: pointer;
+    box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 10px 24px rgba(31,224,216,.22);
+    transition: transform .08s ease, box-shadow .08s ease, filter .12s ease;
+  }
+  .btn:active { transform: translateY(2px); filter: brightness(.94); }
+  .btn.gold {
+    background: linear-gradient(120deg, var(--gold) 0%, #FF9F43 100%);
+    box-shadow: 0 1px 0 rgba(255,255,255,.3) inset, 0 10px 24px rgba(255,197,61,.22);
+  }
+  .btn.ghost {
+    background: transparent; color: var(--white);
+    border: 1px solid var(--line);
+    box-shadow: none; font-weight: 700; font-size: 14px; padding: 12px 30px;
+  }
+  .btn.ghost:active { background: rgba(242,245,250,.06); }
+  .btn:disabled { opacity: .4; pointer-events: none; }
+  .icon-btn {
+    position: absolute; top: max(16px, env(safe-area-inset-top)); left: 16px;
+    width: 38px; height: 38px; border-radius: 10px;
+    background: rgba(242,245,250,.05); border: 1px solid var(--line);
+    color: var(--white); font-size: 18px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; z-index: 21;
+  }
+  .icon-btn:active { background: rgba(242,245,250,.1); }
 
-  #analysis{position:absolute;right:14px;bottom:22px;width:min(300px,72vw);
-    background:var(--ink);border:1px solid rgba(242,245,240,.22);backdrop-filter:blur(8px);
-    padding:12px 14px;transform:translateY(16px);opacity:0;transition:.35s;pointer-events:none;z-index:4}
-  #analysis.show{transform:none;opacity:1}
-  #analysis h3{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--volt);margin-bottom:8px}
-  #wave{width:100%;height:48px;display:block;margin-bottom:8px}
-  .bars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;font-family:var(--mono);font-size:11px}
-  .bar{height:6px;background:rgba(242,245,240,.15);position:relative}
-  .bar i{position:absolute;inset:0 auto 0 0;background:var(--teal)}
-  .bars .pct{opacity:.8;min-width:34px;text-align:right}
-  #kickRow{margin-top:8px;padding-top:8px;border-top:1px dashed rgba(242,245,240,.25);
-    font-family:var(--mono);font-size:12px;display:flex;justify-content:space-between}
-  #kickRow b{color:var(--volt)}
+  @media (orientation: landscape) and (max-height: 520px) {
+    .screen { gap: 8px; justify-content: flex-start; padding-top: 16px; }
+    h1.title { font-size: clamp(20px, 4.5vw, 30px); }
+    .howto { font-size: 11px; padding: 10px 14px; gap: 4px; }
+    .subtitle { font-size: 12px; }
+  }
 
-  #btnReplay{position:absolute;left:14px;bottom:170px;z-index:8;display:none;
-    font-family:var(--mono);font-size:12px;letter-spacing:.12em;padding:10px 14px;
-    background:var(--ink);color:var(--volt);border:1px solid var(--volt);cursor:pointer}
-  #btnReplay.show{display:block}
+  /* ===== モード選択カード ===== */
+  .mode-grid { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 480px; }
+  .mode-card {
+    flex: 1 1 190px; min-width: 160px;
+    background: linear-gradient(165deg, rgba(242,245,250,.055), rgba(242,245,250,.02));
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 20px 16px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color .15s ease, transform .1s ease, background .15s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .mode-card:active { transform: scale(.98); }
+  .mode-card .mc-icon {
+    width: 42px; height: 42px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(31,224,216,.12); margin-bottom: 14px;
+    font-size: 20px;
+  }
+  .mode-card .mc-title { font-family: var(--accent-font); font-weight: 700; font-size: 19px; letter-spacing: .02em; color: var(--white); }
+  .mode-card .mc-desc { font-size: 11.5px; color: var(--mute); margin-top: 6px; line-height: 1.6; }
+  .mode-card.hover, .mode-card:hover { border-color: rgba(31,224,216,.4); background: linear-gradient(165deg, rgba(31,224,216,.08), rgba(242,245,250,.02)); }
+  .mode-card[data-mode="TIME"] .mc-icon { background: rgba(255,197,61,.14); }
 
-  /* リプレイオーバーレイ */
-  #replayOv{position:absolute;inset:0;background:rgba(4,10,7,.92);z-index:30;display:none;
-    align-items:center;justify-content:center;flex-direction:column}
-  #replayOv.show{display:flex}
-  #replayC{max-width:96vw;max-height:78vh;border:1px solid rgba(242,245,240,.3)}
-  #replayBar{display:flex;gap:12px;align-items:center;margin-top:12px;font-family:var(--mono);font-size:12px}
-  #replayBar .tag{color:var(--volt);letter-spacing:.2em}
+  /* ===== 難易度カード ===== */
+  .diff-grid { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 380px; }
+  .diff-card {
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--body-font);
+    background: rgba(242,245,250,.03);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 13px 18px;
+    cursor: pointer;
+    transition: all .12s ease;
+    text-align: left;
+  }
+  .diff-card .dc-name { font-weight: 800; font-size: 15px; color: var(--white); }
+  .diff-card .dc-detail { font-weight: 500; font-size: 11px; color: var(--mute); margin-top: 2px; }
+  .diff-card .dc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
+  .diff-card.selected {
+    border-color: var(--cyan);
+    background: rgba(31,224,216,.08);
+  }
+  .diff-card.selected .dc-dot { background: var(--cyan); box-shadow: 0 0 8px rgba(31,224,216,.8); }
 
-  /* オーバーレイ共通 */
-  .overlay{position:absolute;inset:0;background:linear-gradient(rgba(6,16,11,.86),rgba(6,16,11,.95));
-    display:flex;align-items:center;justify-content:center;z-index:20;overflow:auto}
-  .panel{max-width:560px;width:90vw;border:1px solid rgba(242,245,240,.25);padding:26px 24px;background:rgba(11,31,22,.6);margin:20px 0}
-  .panel .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.28em;color:var(--volt)}
-  .panel h1{font-family:var(--display);font-size:clamp(34px,7.5vw,54px);line-height:1;margin:6px 0 2px;letter-spacing:.02em}
-  .panel h1 span{color:var(--volt)}
-  .panel .jp{font-size:13px;letter-spacing:.3em;opacity:.8;margin-bottom:12px}
-  .panel p{font-size:13.5px;line-height:1.8;opacity:.9;margin:10px 0}
-  .grouplbl{font-family:var(--mono);font-size:10px;letter-spacing:.24em;color:var(--volt);margin:14px 0 6px}
-  .chips{display:flex;gap:8px;flex-wrap:wrap}
-  .chip{padding:10px 14px;border:1px solid rgba(242,245,240,.35);font-size:13px;cursor:pointer;user-select:none;background:transparent;color:var(--chalk);font-weight:700}
-  .chip.sel{background:var(--volt);color:#0B1F16;border-color:var(--volt)}
-  .rulebox{border:1px dashed rgba(242,245,240,.3);padding:11px 13px;margin:14px 0 4px;font-size:12.5px;line-height:1.85}
-  .rulebox b{color:var(--volt);font-family:var(--mono)}
-  .btnrow{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
-  button{font-family:var(--body);font-weight:700;font-size:15px;cursor:pointer;border:0;
-    padding:13px 22px;background:var(--volt);color:#0B1F16;letter-spacing:.04em}
-  button.ghost{background:transparent;color:var(--chalk);border:1px solid rgba(242,245,240,.4)}
-  button:active{transform:translateY(1px)}
-  .hidden{display:none !important}
+  /* ===== スコア履歴(ベスト5) ===== */
+  .best5-box {
+    width: 100%; max-width: 380px;
+    background: rgba(242,245,250,.025);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .best5-title {
+    font-family: var(--accent-font); font-weight: 700; font-size: 11px;
+    letter-spacing: .18em; color: var(--mute); text-align: left; margin-bottom: 8px;
+  }
+  .best5-list { display: grid; gap: 5px; }
+  .best5-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .best5-rank {
+    font-family: var(--hud-font); font-size: 11px; width: 20px; text-align: center;
+    color: var(--mute);
+  }
+  .best5-row:nth-child(1) .best5-rank { color: var(--gold); }
+  .best5-row:nth-child(2) .best5-rank { color: #C9D3E0; }
+  .best5-row:nth-child(3) .best5-rank { color: #CD8A5A; }
+  .best5-score { font-weight: 800; color: var(--white); flex: 1; text-align: left; }
+  .best5-date { font-size: 10.5px; color: var(--mute); }
+  .best5-empty { font-size: 12px; color: var(--mute); padding: 6px 0; }
 
-  /* リザルト */
-  #resultOv .rank{font-family:var(--display);font-size:clamp(90px,24vw,180px);line-height:1;color:var(--volt);text-align:center}
-  #resultOv .rscore{font-family:var(--display);font-size:38px;text-align:center;margin:4px 0 2px}
-  #resultOv .rbest{font-family:var(--mono);font-size:12px;letter-spacing:.2em;opacity:.75;text-align:center;margin-bottom:8px}
+  .highscore-line { font-size: 12px; font-weight: 700; color: var(--gold); letter-spacing: .06em; }
 
-  @media (prefers-reduced-motion: reduce){
-    #verdict.show{animation:none;opacity:1}
-    #analysis{transition:none}
+  /* ===== 判定5要素の凡例 ===== */
+  .ball-legend {
+    width: 100%; max-width: 420px;
+    background: rgba(242,245,250,.03);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: grid; gap: 6px;
+    text-align: left;
+  }
+  .bl-title {
+    font-family: var(--accent-font); font-weight: 700; font-size: 11px;
+    letter-spacing: .18em; color: var(--mute); margin-bottom: 2px;
+  }
+  .bl-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--mute); line-height: 1.5;
+  }
+  .bl-row b { color: var(--white); }
+  .bl-dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px rgba(245,248,255,.3);
+  }
+
+  .howto {
+    display: grid; gap: 8px;
+    font-size: 12.5px; font-weight: 500;
+    color: var(--mute);
+    background: rgba(242,245,250,.03);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 18px;
+    max-width: 430px;
+    text-align: left;
+    line-height: 1.7;
+  }
+  .howto b { color: var(--cyan); font-weight: 800; }
+
+  /* ===== ゲーム中 HUD ===== */
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    padding: calc(env(safe-area-inset-top) + 10px) 14px 10px;
+    display: flex; align-items: stretch; justify-content: space-between; gap: 10px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  #hud.hidden { display: none; }
+  .hud-cell {
+    background: var(--navy-glass);
+    border: 1px solid rgba(31,224,216,.3);
+    border-radius: 10px;
+    padding: 8px 14px;
+    min-width: 92px;
+    text-align: center;
+    backdrop-filter: blur(6px);
+  }
+  .hud-label { font-family: var(--accent-font); font-size: 10px; font-weight: 700; letter-spacing: .25em; color: var(--mute); }
+  .hud-value { font-family: var(--hud-font); font-size: 24px; color: var(--white); line-height: 1.15; }
+  #hud-score .hud-value { color: var(--gold); text-shadow: 0 0 12px rgba(255,197,61,.5); }
+  #hud-time.warn .hud-value { color: var(--red); text-shadow: 0 0 12px rgba(255,71,87,.6); animation: pulse .6s infinite alternate; }
+  @keyframes pulse { from { opacity: 1; } to { opacity: .55; } }
+
+  #combo-banner {
+    position: absolute; top: 22%; left: 0; right: 0;
+    text-align: center; z-index: 9; pointer-events: none;
+    opacity: 0; transition: opacity .18s ease;
+  }
+  #combo-banner.show { opacity: 1; }
+  #combo-banner .combo-num {
+    font-family: var(--hud-font);
+    font-size: clamp(44px, 13vw, 84px);
+    color: var(--gold);
+    text-shadow: 0 0 26px rgba(255,197,61,.75), 0 5px 0 rgba(0,0,0,.4);
+  }
+  #combo-banner .combo-word {
+    font-family: var(--hud-font); font-size: 16px; color: var(--cyan);
+    letter-spacing: .3em; text-shadow: 0 0 12px rgba(35,224,255,.7);
+  }
+
+  #flip-btn, #quit-btn {
+    position: absolute; z-index: 15;
+    bottom: calc(env(safe-area-inset-bottom) + 16px);
+    background: var(--navy-glass);
+    border: 1px solid rgba(245,248,255,.3);
+    color: var(--white);
+    font-family: var(--body-font); font-weight: 700; font-size: 13px;
+    border-radius: 999px; padding: 10px 18px; cursor: pointer;
+    backdrop-filter: blur(6px);
+  }
+  #flip-btn { right: 14px; }
+  #quit-btn { left: 14px; }
+  #flip-btn.hidden, #quit-btn.hidden { display: none; }
+
+  /* ポジショニングガイド */
+  #positioning-msg {
+    position: absolute; left: 0; right: 0;
+    bottom: calc(env(safe-area-inset-bottom) + 84px);
+    text-align: center; z-index: 12; pointer-events: none;
+  }
+  #positioning-msg.hidden { display: none; }
+  #positioning-msg .msg-pill {
+    display: inline-block;
+    background: var(--navy-glass);
+    border: 1px solid rgba(35,224,255,.4);
+    border-radius: 999px;
+    padding: 12px 22px;
+    font-weight: 700; font-size: 14px;
+    backdrop-filter: blur(6px);
+  }
+  #positioning-msg .msg-pill.ok { border-color: var(--gold); color: var(--gold); }
+
+  #countdown {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 14; pointer-events: none;
+  }
+  #countdown.hidden { display: none; }
+  #countdown span {
+    font-family: var(--hud-font);
+    font-size: clamp(90px, 30vw, 180px);
+    color: var(--white);
+    text-shadow: 0 0 40px rgba(35,224,255,.8), 0 8px 0 rgba(0,0,0,.4);
+  }
+
+  /* ===== タッチ解析カード(プレー後表示) ===== */
+  #analysis {
+    position: absolute; right: 12px;
+    bottom: calc(env(safe-area-inset-bottom) + 70px);
+    width: min(290px, 74vw);
+    background: var(--navy-glass);
+    border: 1px solid rgba(31,224,216,.35);
+    border-radius: 14px;
+    padding: 12px 14px;
+    backdrop-filter: blur(8px);
+    z-index: 11;
+    transform: translateY(14px); opacity: 0;
+    transition: .3s ease;
+    pointer-events: none;
+    text-align: left;
+  }
+  #analysis.show { transform: none; opacity: 1; }
+  #analysis h3 {
+    font-family: var(--accent-font); font-weight: 700;
+    font-size: 11px; letter-spacing: .2em; color: var(--cyan);
+    margin-bottom: 8px;
+  }
+  #an-wave { width: 100%; height: 44px; display: block; margin-bottom: 8px; }
+  .an-bars { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; font-size: 11px; font-weight: 700; }
+  .an-bar { height: 6px; background: rgba(242,245,250,.12); border-radius: 3px; position: relative; overflow: hidden; }
+  .an-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--cyan), var(--cyan2)); border-radius: 3px; }
+  .an-bars .an-pct { color: var(--mute); min-width: 34px; text-align: right; font-family: var(--accent-font); }
+  #an-foot {
+    margin-top: 8px; padding-top: 8px;
+    border-top: 1px dashed rgba(242,245,250,.2);
+    font-size: 11.5px; font-weight: 700;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  #an-foot b { color: var(--gold); font-family: var(--accent-font); }
+
+  /* リプレイ再生オーバーレイ */
+  #replay-overlay video {
+    width: min(88vw, 440px); max-height: 62vh;
+    border-radius: 16px;
+    border: 2px solid rgba(35,224,255,0.5);
+    box-shadow: 0 0 30px rgba(35,224,255,0.25);
+    background: #000;
+  }
+
+  /* 結果画面 */
+  .rank-badge {
+    font-family: var(--hud-font);
+    font-size: clamp(72px, 22vw, 130px);
+    line-height: 1;
+    color: var(--gold);
+    text-shadow: 0 0 36px rgba(255,197,61,.8), 0 6px 0 rgba(0,0,0,.4);
+  }
+  .result-score {
+    font-family: var(--hud-font);
+    font-size: clamp(40px, 12vw, 68px);
+    color: var(--white);
+    text-shadow: 0 0 18px rgba(35,224,255,.5);
+  }
+  .result-stats {
+    display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+    max-width: 460px;
+  }
+  .stat-box {
+    background: rgba(242,245,250,.03);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 18px; min-width: 100px;
+  }
+  .stat-box .s-label { font-family: var(--accent-font); font-size: 10px; font-weight: 700; letter-spacing: .15em; color: var(--mute); }
+  .stat-box .s-value { font-family: var(--hud-font); font-size: 22px; color: var(--cyan); }
+  .newrecord { font-weight: 800; color: var(--gold); font-size: 15px; letter-spacing: .1em; animation: pulse .5s infinite alternate; }
+  .newrecord.hidden { display: none; }
+
+  #loading-note { font-size: 12px; color: rgba(245,248,255,.6); font-weight: 500; }
+  .spinner {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    border: 4px solid rgba(35,224,255,.2);
+    border-top-color: var(--cyan);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #error-box, #error-box-diff {
+    background: rgba(255,71,87,.12);
+    border: 1px solid rgba(255,71,87,.5);
+    border-radius: 14px;
+    padding: 14px 18px;
+    font-size: 13px; font-weight: 500; line-height: 1.7;
+    max-width: 420px; color: #FFD3D8;
+  }
+  #error-box.hidden, #error-box-diff.hidden { display: none; }
+  .hidden { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
   }
 </style>
 </head>
 <body>
 <div id="stage">
-  <video id="cam" autoplay playsinline muted></video>
-  <div id="vignette"></div>
-  <canvas id="game"></canvas>
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="canvas"></canvas>
 
-  <div id="hud">
-    <div class="scoreboard">
-      <div class="cell"><div class="lbl">スコア</div><div class="val volt" id="score">0</div></div>
-      <div class="cell"><div class="lbl">タイム</div><div class="val" id="timeVal">0:00</div></div>
-      <div class="cell"><div class="lbl">成功 / 回</div><div class="val" id="succ">0/0</div></div>
-    </div>
-    <div id="coach">モードを選んで開始してください。</div>
+  <!-- HUD (スコア / タイム / 成功/回) -->
+  <div id="hud" class="hidden">
+    <div class="hud-cell" id="hud-score"><div class="hud-label">スコア</div><div class="hud-value" id="score-val">0</div></div>
+    <div class="hud-cell" id="hud-time"><div class="hud-label">タイム</div><div class="hud-value" id="time-val">0:00</div></div>
+    <div class="hud-cell" id="hud-succ"><div class="hud-label">成功 / 回</div><div class="hud-value" id="succ-val">0/0</div></div>
   </div>
+  <div id="combo-banner"><div class="combo-num" id="combo-num">2</div><div class="combo-word">COMBO</div></div>
 
-  <div id="poseBadge"><i></i>AI POSE</div>
-  <div id="meter"><div id="meterFill"></div></div>
-  <div id="meterLbl">MOTION</div>
-  <div id="verdict"></div>
-  <div id="countdown"><div id="cdNum">3</div></div>
+  <div id="positioning-msg" class="hidden"><span class="msg-pill" id="positioning-pill">画面の左端か右端に立ってください</span></div>
+  <div id="countdown" class="hidden"><span id="countdown-num">3</span></div>
 
+  <!-- タッチ解析カード(プレー後に表示) -->
   <div id="analysis">
-    <h3>AI TOUCH ANALYSIS ── 骨格解析</h3>
-    <canvas id="wave" width="272" height="48"></canvas>
-    <div class="bars">
-      <span>①姿勢/構え</span><div class="bar"><i id="bPosture"></i></div><span class="pct" id="pPosture">–</span>
-      <span>②ポイント</span><div class="bar"><i id="bPoint"></i></div><span class="pct" id="pPoint">–</span>
-      <span>③タイミング</span><div class="bar"><i id="bTiming"></i></div><span class="pct" id="pTiming">–</span>
-      <span>④吸収</span><div class="bar"><i id="bCushion"></i></div><span class="pct" id="pCushion">–</span>
+    <h3>AI TOUCH ANALYSIS ── 5要素解析</h3>
+    <canvas id="an-wave" width="260" height="44"></canvas>
+    <div class="an-bars">
+      <span>①姿勢/構え</span><div class="an-bar"><i id="an-posture"></i></div><span class="an-pct" id="an-posture-p">–</span>
+      <span>②ポイント</span><div class="an-bar"><i id="an-point"></i></div><span class="an-pct" id="an-point-p">–</span>
+      <span>③タイミング</span><div class="an-bar"><i id="an-timing"></i></div><span class="an-pct" id="an-timing-p">–</span>
+      <span>④吸収</span><div class="an-bar"><i id="an-cushion"></i></div><span class="an-pct" id="an-cushion-p">–</span>
     </div>
-    <div id="kickRow"><span>⑤キックまで</span><b id="kickTime">–</b></div>
+    <div id="an-foot"><span id="an-touch">–</span><span>⑤キック <b id="an-kick">–</b></span></div>
   </div>
 
-  <button id="btnReplay">▶ REPLAY</button>
-  <div id="replayOv">
-    <canvas id="replayC"></canvas>
-    <div id="replayBar">
-      <span class="tag">SLOW REPLAY ×0.5</span>
-      <button class="ghost" id="btnReplayClose" style="padding:8px 16px;font-size:13px">閉じる</button>
-    </div>
+  <button id="flip-btn" class="hidden">カメラ切替</button>
+  <button id="quit-btn" class="hidden">やめる</button>
+
+  <!-- リプレイ再生オーバーレイ -->
+  <div id="replay-overlay" class="screen hidden" style="z-index: 30;">
+    <div class="eyebrow">REPLAY — 1プレイまるごと</div>
+    <video id="replay-video" controls playsinline loop></video>
+    <button class="btn" id="replay-close-btn">閉じる</button>
   </div>
 
-  <!-- ===== モード選択 ===== -->
-  <div class="overlay" id="menuOv">
-    <div class="panel">
-      <div class="eyebrow">HK FOOTBALL ACADEMY SERIES</div>
-      <h1>TRAP CONTROL <span>CHALLENGE</span></h1>
-      <div class="jp">トラップコントロールチャレンジ</div>
-
-      <div class="grouplbl">GAME MODE</div>
-      <div class="chips" id="chipsMode">
-        <div class="chip sel" data-v="challenge">チャレンジ（10球）</div>
-        <div class="chip" data-v="practice">練習（フリー）</div>
+  <!-- スタート画面 -->
+  <div id="screen-start" class="screen">
+    <div class="eyebrow">AI FOOTBALL TRAINING</div>
+    <h1 class="title">TRAP CONTROL<br /><span class="gold">CHALLENGE</span></h1>
+    <p class="subtitle">画面の端に立つと、逆サイドからボールが飛んでくる。指定の部位で柔らかくトラップして、サークルの外に出さずに、素早く蹴り返せ。AIがあなたの骨格をリアルタイム分析します。</p>
+    <div class="mode-grid">
+      <div class="mode-card" data-mode="BALLS">
+        <div class="mc-icon">🎯</div>
+        <div class="mc-title">10球チャレンジ</div>
+        <div class="mc-desc">10球のトラップ精度×キックの速さでスコアを競う基本トレーニング</div>
       </div>
-
-      <div class="grouplbl">INPUT</div>
-      <div class="chips" id="chipsInput">
-        <div class="chip sel" data-v="cam">カメラ + AI骨格分析</div>
-        <div class="chip" data-v="sensor">センサー</div>
-        <div class="chip" data-v="tap">タップ</div>
+      <div class="mode-card" data-mode="TIME">
+        <div class="mc-icon">⏱</div>
+        <div class="mc-title">タイムアタック</div>
+        <div class="mc-desc">制限時間内にどれだけ多くのボールをコントロールできるかに挑戦</div>
       </div>
-
-      <div class="rulebox">
-        <b>FLOW</b> 画面の<b>左端か右端に斜めに立つ</b> → AIが骨格検知 → 毎球<b>カウント3</b>でボールが逆サイドから飛来<br>
-        <b>RULE</b> トラップしたボールが<b>コントロールサークル</b>（半径1.4m）の外に出たら OUT。止めたら即キック — 速いほどボーナス。解析結果はプレー後に表示。<br>
-        <b>CAM</b> 距離2.5〜3m・高さ約1m・全身が映る画角。
-      </div>
-
-      <div class="btnrow">
-        <button id="btnStart">START</button>
-      </div>
-      <p style="font-size:11.5px;opacity:.6;margin-top:10px">※ カメラ/AIモデルはGitHub Pages・ブラウザ直接で動作します。アプリ内プレビューではブロックされる場合があります（自動でセンサー/タップに切替可能）。</p>
     </div>
+    <div class="ball-legend">
+      <div class="bl-title">SCORING — 判定5要素</div>
+      <div class="bl-row"><span class="bl-dot" style="background:#1FE0D8"></span><b>①姿勢/構え</b> 膝の屈曲とボールラインへの寄せ</div>
+      <div class="bl-row"><span class="bl-dot" style="background:#2E8FFF"></span><b>②ポイント</b> 指定部位でボールを捉えたか</div>
+      <div class="bl-row"><span class="bl-dot" style="background:#7CFC9A"></span><b>③タイミング</b> 接触の瞬間に動きのピークが合ったか</div>
+      <div class="bl-row"><span class="bl-dot" style="background:#FFC53D"></span><b>④吸収</b> 引き足でボールの勢いを殺せたか → 弱いと円外でOUT</div>
+      <div class="bl-row"><span class="bl-dot" style="background:#FF9F43"></span><b>⑤キック速度</b> 止めてから蹴るまでの反応時間</div>
+    </div>
+    <div class="howto" style="max-width:430px;">
+      <div><b>1.</b> スマホを床や台に立てかけて固定し、2〜3歩下がる</div>
+      <div><b>2.</b> <b>画面の左端か右端</b>に立つ(全身が映るように)</div>
+      <div><b>3.</b> 毎球<b>カウント3</b>のあと逆サイドからボールが来る。<b>触る瞬間に引いて</b>吸収!</div>
+      <div><b>4.</b> サークルから出たら<b>OUT</b>。止めたら<b>即キック</b>で速度ボーナス</div>
+      <div><b>※</b> 解析結果は各プレーの後に表示されます</div>
+    </div>
+    <div id="error-box" class="hidden"></div>
   </div>
 
-  <!-- ===== リザルト ===== -->
-  <div class="overlay hidden" id="resultOv">
-    <div class="panel">
-      <div class="eyebrow">CHALLENGE RESULT</div>
-      <div class="rank" id="rRank">A</div>
-      <div class="rscore" id="rScore">0</div>
-      <div class="rbest" id="rBest">BEST 0</div>
-      <div class="bars" style="margin:10px 0">
-        <span>平均トラップ精度</span><div class="bar"><i id="rTrapBar"></i></div><span class="pct" id="rTrapPct">–</span>
-        <span>平均キック時間</span><div class="bar"><i id="rKickBar"></i></div><span class="pct" id="rKickPct">–</span>
-        <span>OUT数</span><div class="bar"><i id="rOutBar" style="background:var(--red)"></i></div><span class="pct" id="rOutPct">–</span>
+  <!-- モード選択後: 難易度選択画面 -->
+  <div id="screen-difficulty" class="screen hidden">
+    <button class="icon-btn" id="diff-back-btn">←</button>
+    <div class="eyebrow" id="diff-mode-label">TRAP &amp; KICK</div>
+    <h1 class="title" id="diff-mode-title">10球チャレンジ</h1>
+    <p class="subtitle" id="diff-mode-desc">10球のトラップ精度×キックの速さでスコアを競う</p>
+    <div class="diff-grid" id="difficulty-row">
+      <div class="diff-card" data-diff="EASY">
+        <div><div class="dc-name">イージー</div><div class="dc-detail">ゆっくりした球・大きいサークル・キック猶予たっぷり</div></div>
+        <div class="dc-dot"></div>
       </div>
-      <div class="btnrow">
-        <button id="btnRetry">もう一度</button>
-        <button class="ghost" id="btnLastReplay">最後のリプレイ</button>
-        <button class="ghost" id="btnMenu">モード選択</button>
+      <div class="diff-card selected" data-diff="NORMAL">
+        <div><div class="dc-name">ノーマル</div><div class="dc-detail">標準の球速・標準サークル</div></div>
+        <div class="dc-dot"></div>
+      </div>
+      <div class="diff-card" data-diff="HARD">
+        <div><div class="dc-name">ハード</div><div class="dc-detail">速い球・小さいサークル・キック猶予短め</div></div>
+        <div class="dc-dot"></div>
+      </div>
+      <div class="diff-card" data-diff="REAL">
+        <div><div class="dc-name">リアル</div><div class="dc-detail">実物のサッカーボールの物理でボールが落ちてくる</div></div>
+        <div class="dc-dot"></div>
       </div>
     </div>
+    <div class="diff-grid" style="margin-top: 14px;">
+      <div class="diff-card" id="free-mode-card">
+        <div><div class="dc-name">フリーモード</div><div class="dc-detail">終了条件なしで延々と練習(スコア記録・リプレイなし)</div></div>
+        <div class="dc-dot"></div>
+      </div>
+    </div>
+    <div class="best5-box">
+      <div class="best5-title">SCORE HISTORY — BEST 5</div>
+      <div class="best5-list" id="best5-list"></div>
+    </div>
+    <div class="highscore-line" id="streak-line" style="color:#7CFC9A"></div>
+    <button class="btn gold" id="start-btn">ゲームスタート</button>
+    <div id="error-box-diff" class="hidden"></div>
+  </div>
+
+  <!-- ローディング画面 -->
+  <div id="screen-loading" class="screen hidden">
+    <div class="spinner"></div>
+    <div class="subtitle" id="loading-text">AIモデルを読み込んでいます…</div>
+    <div id="loading-note">初回は数秒かかります(モデルは端末内で動作し、映像は送信されません)</div>
+  </div>
+
+  <!-- 結果画面 -->
+  <div id="screen-result" class="screen hidden">
+    <div class="eyebrow">RESULT</div>
+    <div class="rank-badge" id="rank-badge">A</div>
+    <div class="result-score" id="result-score">1250</div>
+    <div class="newrecord hidden" id="newrecord">★ ニューレコード! ★</div>
+    <div class="highscore-line" id="streak-result" style="color:#7CFC9A"></div>
+    <div class="result-stats">
+      <div class="stat-box"><div class="s-label">成功数</div><div class="s-value" id="r-hits">0</div></div>
+      <div class="stat-box"><div class="s-label">成功率</div><div class="s-value" id="r-rate">0%</div></div>
+      <div class="stat-box"><div class="s-label">平均トラップ精度</div><div class="s-value" id="r-avgq">-</div></div>
+      <div class="stat-box"><div class="s-label">平均キック</div><div class="s-value" id="r-kick">-</div></div>
+      <div class="stat-box"><div class="s-label">OUT</div><div class="s-value" id="r-out" style="color:#FF4757">0</div></div>
+      <div class="stat-box"><div class="s-label">PERFECT</div><div class="s-value" id="r-perfect">0</div></div>
+    </div>
+    <button class="btn ghost hidden" id="replay-view-btn">リプレイを見る</button>
+    <a class="btn ghost hidden" id="replay-save-btn" style="text-decoration:none; display:inline-block;">録画を端末に保存</a>
+    <button class="btn" id="replay-btn">もう一度プレイ</button>
+    <button class="btn ghost" id="share-btn">結果をシェア</button>
+    <button class="btn ghost" id="home-btn">ホームに戻る</button>
   </div>
 </div>
 
 <script type="module">
-'use strict';
-/* =========================================================
-   トラップコントロールチャレンジ  (VOLLEY SHOOT CHALLENGE シリーズ)
-   ・MediaPipe Pose によるAI骨格(33点)分析
-   ・正位置チェック → 骨格検知 → カウント3 → スタート
-   ・モード選択(チャレンジ10球 / 練習) ・スローリプレイ
-   ・判定5要素: 姿勢/構え・ポイント・タイミング・吸収・キック速度
-========================================================= */
+/* =========================================================================
+ * TRAP CONTROL CHALLENGE — VOLLEYSHOOT CHALLENGE シリーズ第2弾
+ * 骨格検出: MediaPipe Tasks Vision PoseLandmarker (端末内で動作)
+ * ルール: 逆サイドから飛来するボールを指定部位でトラップ。
+ *         コントロールサークルの外に出したらOUT。止めたら即キック。
+ * 判定5要素: ①姿勢/構え ②ポイント ③タイミング ④吸収 ⑤キック速度
+ * ========================================================================= */
+import {
+  FilesetResolver,
+  PoseLandmarker,
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 
-const $=id=>document.getElementById(id);
-const gameC=$('game'), ctx=gameC.getContext('2d');
-const video=$('cam');
-const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-let W=0,H=0,DPR=1;
-function resize(){
-  DPR=Math.min(devicePixelRatio||1,2);
-  W=innerWidth;H=innerHeight;
-  gameC.width=W*DPR;gameC.height=H*DPR;
-  ctx.setTransform(DPR,0,0,DPR,0,0);
-}
-addEventListener('resize',resize);resize();
-
-const store={
-  get(k){try{return localStorage.getItem(k)}catch(e){return null}},
-  set(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+/* ---------------- 定数・難易度設定 ---------------- */
+const DIFFICULTY = {
+  //           制限時間, 滞空秒,  ばらつき, 円半径(体高比), キック猶予ms, 倍率
+  EASY:   { timeLimit: 90, flight: 2.7, flightVar: 0.3, circle: 0.66, kickLimit: 4500, multiplier: 1.0, gravityF: 0.75 },
+  NORMAL: { timeLimit: 60, flight: 2.2, flightVar: 0.3, circle: 0.56, kickLimit: 3500, multiplier: 1.5, gravityF: 0.85 },
+  HARD:   { timeLimit: 45, flight: 1.75, flightVar: 0.25, circle: 0.47, kickLimit: 2800, multiplier: 2.0, gravityF: 1.0 },
+  REAL:   { timeLimit: 60, flight: 2.2, flightVar: 0.3, circle: 0.56, kickLimit: 3200, multiplier: 1.8, gravityF: 1.0, real: true },
+};
+const BALLS_PER_GAME = 10;          // 10球チャレンジ
+// トラップ部位
+const PARTS = {
+  FOOT:  { label: "足元",   color: "#23E0FF" },
+  THIGH: { label: "モモ",   color: "#7CFC9A" },
+  CHEST: { label: "胸",     color: "#FFC53D" },
+};
+const PART_WEIGHTS = [["FOOT", 0.5], ["THIGH", 0.3], ["CHEST", 0.2]];
+// タッチ部位(足トラップ時の6分類) — シリーズ共通の足軸判定
+const TOUCH_TYPES = {
+  INSTEP:   { label: "インステップ" },
+  INSIDE:   { label: "インサイド" },
+  INFRONT:  { label: "インフロント" },
+  OUTFRONT: { label: "アウトフロント" },
+  OUTSIDE:  { label: "アウトサイド" },
+  HEEL:     { label: "ヒール" },
+};
+// MediaPipe Pose ランドマーク index
+const LM = {
+  NOSE: 0, L_SHOULDER: 11, R_SHOULDER: 12,
+  L_HIP: 23, R_HIP: 24, L_KNEE: 25, R_KNEE: 26,
+  L_ANKLE: 27, R_ANKLE: 28, L_HEEL: 29, R_HEEL: 30, L_FOOT: 31, R_FOOT: 32,
 };
 
-/* ---------- 効果音 ---------- */
-let AC=null;
-function beep(f=880,d=0.09,g0=0.12){
-  try{
-    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
-    const o=AC.createOscillator(),g=AC.createGain();
-    o.frequency.value=f;o.connect(g);g.connect(AC.destination);
-    g.gain.setValueAtTime(g0,AC.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+d);
-    o.start();o.stop(AC.currentTime+d);
-  }catch(e){}
+/* ---------------- DOM ---------------- */
+const $ = (id) => document.getElementById(id);
+const video = $("video");
+const canvas = $("canvas");
+const ctx = canvas.getContext("2d");
+const screens = {
+  start: $("screen-start"),
+  difficulty: $("screen-difficulty"),
+  loading: $("screen-loading"),
+  result: $("screen-result"),
+};
+const hud = $("hud");
+const hudTime = $("hud-time");
+const scoreVal = $("score-val");
+const timeVal = $("time-val");
+const succVal = $("succ-val");
+const comboBanner = $("combo-banner");
+const comboNum = $("combo-num");
+const positioningMsg = $("positioning-msg");
+const positioningPill = $("positioning-pill");
+const countdownEl = $("countdown");
+const countdownNum = $("countdown-num");
+const flipBtn = $("flip-btn");
+const quitBtn = $("quit-btn");
+const analysisEl = $("analysis");
+
+/* ---------------- 状態 ---------------- */
+let gameMode = "BALLS";           // BALLS | TIME
+let difficulty = "NORMAL";
+let freeMode = false;
+let phase = "start";              // start | loading | positioning | playing | result
+let sub = "idle";                 // playing内: precount | flight | roll | kick | after
+let facingMode = "environment";
+let mirrored = false;
+let stream = null;
+let poseLandmarker = null;
+let lastVideoTime = -1;
+let poseSeenAt = 0;
+let rafHandle = 0;
+let lastFrameTs = 0;
+let positioningStableSince = 0;
+
+let bodyParts = {};               // footL/R, thighL/R, chest (+speed)
+let feet = { left: null, right: null };
+let prevFeet = { left: null, right: null };
+const poseBuf = [];               // 判定用スナップショット
+let anchorGround = 0, anchorBodyH = 0, anchorHipX = 0;
+
+let ball = null;
+let particles = [];
+let popups = [];
+let timerHandle = null;
+let timeRemaining = 0;
+let activeMs = 0;                 // 経過タイム(カウント中は止まる)
+
+// 1ゲームの集計
+let score = 0, ballsDone = 0, hits = 0, outs = 0, misses = 0, slows = 0;
+let combo = 0, maxCombo = 0, perfectKicks = 0;
+let trapQs = [], kickTs = [];
+let lastHitAt = 0;
+let lastResultSummary = null;
+
+// 1球の状態
+let requiredPart = "FOOT";
+let contactAt = 0;
+let trapResult = null;
+let settleAt = 0, kickDeadline = 0;
+let cdEnd = 0, cdLast = 4;
+let circleCx = 0, circleR = 0;
+
+/* ---------------- ユーティリティ ---------------- */
+const DPR = () => Math.min(2, window.devicePixelRatio || 1);
+function show(el) { el.classList.remove("hidden"); }
+function hide(el) { el.classList.add("hidden"); }
+function setScreen(name) {
+  for (const k in screens) screens[k].classList.toggle("hidden", k !== name);
+}
+function vibrate(pattern) { try { navigator.vibrate && navigator.vibrate(pattern); } catch {} }
+function fmtTime(sec) {
+  sec = Math.max(0, Math.floor(sec));
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 }
 
-/* ---------- 座標系 ---------- */
-const CAM={h:1.5, f:()=>H*0.9};
-function project(x,y,z){
-  const zz=Math.max(z+1.6,0.35);
-  const s=CAM.f()/zz;
-  return {sx:W/2 + x*s, sy:H*0.52 - (y-CAM.h*0.62)*s, s};
+/* ---------------- 永続化(ハイスコア/BEST5/連続日数) ---------------- */
+function hsKey(d) { return `trapcontrol_highscore_${gameMode}_${d}`; }
+function todayStr() {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
 }
-function unprojectX(sx,z){ const s=CAM.f()/(z+1.6); return (sx-W/2)/s; }
-const CIRCLE={cx:0, cz:0.8, r:1.4};
-
-/* ---------- 物理 ---------- */
-const G=9.81, RHO=1.2, R=0.11, A=Math.PI*R*R, M=0.43, CD=0.25, CL=0.20;
-function makeServe(level,aimSx){
-  const type=['ground','driven','loft'][Math.floor(Math.random()*3)];
-  let side; // 1=画面右から進入, -1=画面左から進入(プレイヤーの逆サイド)
-  if(aimSx!=null) side = aimSx<W/2 ? 1 : -1;
-  else side = Math.random()<0.5?-1:1;
-  const x0=side*7.5; // 画面外の横から進入
-  let targetX;
-  if(aimSx!=null){ // プレイヤー骨格位置の少し手前(進入側)で触れる位置へ
-    targetX=unprojectX(aimSx,CIRCLE.cz+0.1)+side*(0.15+Math.random()*0.35);
-  }else{
-    targetX=(Math.random()*2-1)*0.4;
-  }
-  targetX=Math.max(-1.1,Math.min(1.1,targetX));
-  const T=Math.max(1.25,(gameMode==='practice'?2.5:2.1)-level*0.08);
-  const b={x:x0, y:0.3, z:CIRCLE.cz+0.2+Math.random()*0.6, type,
-    spin:(Math.random()*2-1)*6, trail:[], bounced:0, side, targetX};
-  b.targetY = type==='ground'?0.15 : type==='driven'? 0.5+Math.random()*0.3 : 1.05+Math.random()*0.25;
-  b.vx=(targetX-x0)/T*1.12;
-  b.vz=((CIRCLE.cz+0.1)-b.z)/T;
-  b.vy=(b.targetY-b.y)/T + 0.5*G*T*(type==='loft'?0.95:type==='driven'?0.55:0.25);
-  if(type==='ground'){b.y=0.12;b.vy=0.4;}
-  b.T=T;
-  return b;
-}
-function stepBall(b,dt){
-  const v=Math.hypot(b.vx,b.vy,b.vz)||1e-6;
-  const k=0.5*RHO*A/M;
-  const drag=k*CD*v;
-  const mag=k*CL*v*b.spin*0.15;
-  b.vx+=(-drag*b.vx + mag*b.vz/v)*dt;
-  b.vy+=(-G -drag*b.vy)*dt;
-  b.vz+=(-drag*b.vz - mag*b.vx/v)*dt;
-  b.x+=b.vx*dt; b.y+=b.vy*dt; b.z+=b.vz*dt;
-  if(b.y<R && b.vy<0){ b.y=R; b.vy*=-0.55; b.vx*=0.85; b.vz*=0.88; b.bounced++; }
-  if(b.y<=R+0.01){ const f=Math.max(0,1-2.2*dt); b.vx*=f;b.vz*=f; }
-  b.trail.push({x:b.x,y:b.y,z:b.z});
-  if(b.trail.length>26)b.trail.shift();
-}
-const planarDist=b=>Math.hypot(b.x-CIRCLE.cx, b.z-CIRCLE.cz);
-const ballSpeed=b=>Math.hypot(b.vx,b.vy,b.vz);
-
-/* ---------- AI骨格 (MediaPipe Pose) ---------- */
-const LM={nose:0,ls:11,rs:12,le:13,re:14,lw:15,rw:16,lh:23,rh:24,lk:25,rk:26,la:27,ra:28,lf:31,rf:32};
-const BONES=[['ls','rs'],['ls','lh'],['rs','rh'],['lh','rh'],
-  ['lh','lk'],['lk','la'],['rh','rk'],['rk','ra'],['la','lf'],['ra','rf'],
-  ['ls','le'],['le','lw'],['rs','re'],['re','rw']];
-let poseLandmarker=null, poseReady=false, poseBusy=false, lastPose=null;
-const poseBuf=[];
-let camReady=false;
-
-function coverSrcRect(){
-  const vw=video.videoWidth,vh=video.videoHeight;
-  if(!vw)return null;
-  const sr=W/H, vr=vw/vh;
-  let sx,sy,sw,sh;
-  if(vr>sr){ sh=vh; sw=vh*sr; sx=(vw-sw)/2; sy=0; }
-  else{ sw=vw; sh=vw/sr; sx=0; sy=(vh-sh)/2; }
-  return {sx,sy,sw,sh,vw,vh};
-}
-function mapLm(lm,src){ // 正規化座標 → 鏡像スクリーンpx
-  const px=lm.x*src.vw, py=lm.y*src.vh;
-  const u=(px-src.sx)/src.sw, v=(py-src.sy)/src.sh;
-  return {x:(1-u)*W, y:v*H, vis:lm.visibility??1};
-}
-function angleDeg(a,b,c){ // bを頂点とする角度
-  const v1={x:a.x-b.x,y:a.y-b.y}, v2={x:c.x-b.x,y:c.y-b.y};
-  const d=(v1.x*v2.x+v1.y*v2.y)/((Math.hypot(v1.x,v1.y)*Math.hypot(v2.x,v2.y))||1e-6);
-  return Math.acos(Math.max(-1,Math.min(1,d)))*180/Math.PI;
-}
-function runPose(now){
-  if(!poseLandmarker||!camReady||poseBusy||video.readyState<2)return;
-  poseBusy=true;
-  try{
-    const res=poseLandmarker.detectForVideo(video,now);
-    const src=coverSrcRect();
-    if(res.landmarks&&res.landmarks[0]&&src){
-      const raw=res.landmarks[0];
-      const pts={};
-      for(const k in LM)pts[k]=mapLm(raw[LM[k]],src);
-      const knee=(angleDeg(pts.lh,pts.lk,pts.la)+angleDeg(pts.rh,pts.rk,pts.ra))/2;
-      lastPose={t:now,pts,knee,present:true};
-    }else lastPose={t:now,present:false};
-  }catch(e){lastPose={t:now,present:false};}
-  poseBusy=false;
-  poseBuf.push(lastPose);
-  while(poseBuf.length&&now-poseBuf[0].t>2200)poseBuf.shift();
-  $('poseBadge').classList.toggle('on',!!(lastPose&&lastPose.present));
-  // モーションメーター: 足の速度
-  if(lastPose&&lastPose.present){
-    const prev=[...poseBuf].reverse().find(p=>p.present&&p.t<lastPose.t-15);
-    if(prev){
-      const sp=partSpeed(prev,lastPose,'foot');
-      $('meterFill').style.height=Math.min(100,sp/H*45)+'%';
+function updateStreak() {
+  try {
+    const today = todayStr();
+    const last = localStorage.getItem("trapcontrol_last_day");
+    let streak = Number(localStorage.getItem("trapcontrol_streak")) || 0;
+    if (last !== today) {
+      const y = new Date(); y.setDate(y.getDate() - 1);
+      const yesterday = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`;
+      streak = last === yesterday ? streak + 1 : 1;
+      localStorage.setItem("trapcontrol_streak", String(streak));
+      localStorage.setItem("trapcontrol_last_day", today);
     }
-  }
+    return streak;
+  } catch { return 0; }
 }
-function partPoints(e,part){
-  if(part==='chest'){
-    const ms={x:(e.pts.ls.x+e.pts.rs.x)/2,y:(e.pts.ls.y+e.pts.rs.y)/2};
-    const mh={x:(e.pts.lh.x+e.pts.rh.x)/2,y:(e.pts.lh.y+e.pts.rh.y)/2};
-    return [{x:ms.x+(mh.x-ms.x)*0.35,y:ms.y+(mh.y-ms.y)*0.35}];
-  }
-  if(part==='thigh')return [e.pts.lk,e.pts.rk];
-  return [e.pts.lf,e.pts.rf,e.pts.la,e.pts.ra];
+function getStreak() {
+  try {
+    const last = localStorage.getItem("trapcontrol_last_day");
+    const streak = Number(localStorage.getItem("trapcontrol_streak")) || 0;
+    if (!last) return 0;
+    const today = todayStr();
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const yesterday = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`;
+    return (last === today || last === yesterday) ? streak : 0;
+  } catch { return 0; }
 }
-function partSpeed(e1,e2,part){ // px/s (最速点)
-  const p1=partPoints(e1,part),p2=partPoints(e2,part);
-  const dt=(e2.t-e1.t)/1000||1e-3;
-  let mx=0;
-  for(let i=0;i<Math.min(p1.length,p2.length);i++)
-    mx=Math.max(mx,Math.hypot(p2[i].x-p1[i].x,p2[i].y-p1[i].y)/dt);
-  return mx;
+function getHighScore(d) { try { return Number(localStorage.getItem(hsKey(d))) || 0; } catch { return 0; } }
+function setHighScore(d, v) { try { localStorage.setItem(hsKey(d), String(v)); } catch {} }
+function scoreHistKey(mode, d) { return `trapcontrol_scorehist_${mode}_${d}`; }
+function getScoreHistory(mode, d) {
+  try {
+    const raw = localStorage.getItem(scoreHistKey(mode, d));
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
 }
-const partFor=y=>y>0.95?'chest':y>0.42?'thigh':'foot';
-
-/* ---------- 採点 ---------- */
-function judgeTrap(contactT){
-  if(inputMode==='tap')return judgeTap(contactT);
-  if(inputMode==='sensor')return judgeSensor(contactT);
-  return judgePose(contactT);
+function pushScoreHistory(mode, d, s) {
+  try {
+    const arr = getScoreHistory(mode, d);
+    const t = new Date();
+    arr.push({ score: s, date: `${t.getMonth() + 1}/${t.getDate()}` });
+    arr.sort((a, b) => b.score - a.score);
+    arr.length = Math.min(arr.length, 5);
+    localStorage.setItem(scoreHistKey(mode, d), JSON.stringify(arr));
+    return arr;
+  } catch { return []; }
 }
-function judgePose(contactT){
-  const part=partFor(ball.targetY);
-  const zx=zoneRect.x*W, zy=zoneRect.y*H, zr=zoneRect.r*Math.min(W,H)*1.15;
-  const win=poseBuf.filter(e=>e.present&&Math.abs(e.t-contactT)<=460);
-  if(win.length<5)return {miss:true,wave:[],reason:'骨格を検出できませんでした'};
-  // 系列: ゾーンに最も近い部位点で距離と速度
-  const series=[];
-  for(let i=0;i<win.length;i++){
-    const cands=partPoints(win[i],part);
-    let best=cands[0],bd=1e9;
-    for(const c of cands){const d=Math.hypot(c.x-zx,c.y-zy);if(d<bd){bd=d;best=c;}}
-    const sp=i?partSpeed(win[i-1],win[i],part):0;
-    series.push({t:win[i].t,p:best,dist:bd,speed:sp});
-  }
-  const minDist=Math.min(...series.map(s=>s.dist));
-  if(minDist>zr*1.8)return {miss:true,wave:series.map(s=>({t:s.t,zone:s.speed/H*100})),
-    reason:part==='chest'?'胸がゾーンに届いていません':part==='thigh'?'腿がゾーンに届いていません':'足がゾーンに届いていません'};
-  // ③タイミング: 速度ピーク vs 接触
-  let peak=0,peakT=contactT;
-  for(const s of series){if(s.speed>peak){peak=s.speed;peakT=s.t;}}
-  const dtErr=peakT-contactT;
-  const timing=Math.max(0,1-Math.max(0,Math.abs(dtErr)-70)/300);
-  // ②ポイント: 接触時刻に最も近いフレームでの部位—ゾーン中心距離
-  const cE=series.reduce((a,s)=>Math.abs(s.t-contactT)<Math.abs(a.t-contactT)?s:a);
-  const point=Math.max(0,1-cE.dist/(zr*1.4));
-  // ④吸収: 接触後の速度が滑らかに減衰(引き足)しているか
-  const after=series.filter(s=>s.t>contactT+40&&s.t<contactT+380);
-  const afterAvg=after.length?after.reduce((a,s)=>a+s.speed,0)/after.length:peak;
-  const cushion=Math.max(0,1-Math.abs(afterAvg/(peak||1)-0.45)/0.45);
-  // ①姿勢/構え: 到達前の膝屈曲 + ボールラインへのポジショニング
-  const pre=poseBuf.filter(e=>e.present&&e.t>contactT-650&&e.t<contactT-150);
-  let posture=0.5;
-  if(pre.length){
-    const kneeAvg=pre.reduce((a,e)=>a+e.knee,0)/pre.length;
-    const kneeScore=Math.max(0,Math.min(1,(172-kneeAvg)/30));
-    const hipX=pre.reduce((a,e)=>a+(e.pts.lh.x+e.pts.rh.x)/2,0)/pre.length;
-    const posScore=Math.max(0,1-Math.abs(hipX-zx)/(zr*2.4));
-    posture=kneeScore*0.5+posScore*0.5;
-  }
-  const q=timing*0.3+cushion*0.3+point*0.2+posture*0.2;
-  return {miss:false,q,timing,cushion,point,posture,dtErr,
-    wave:series.map(s=>({t:s.t,zone:s.speed/(peak||1)*90}))};
-}
-/* センサー: 加速度スパイク */
-const motionBuf=[];
-function judgeSensor(contactT){
-  const win=motionBuf.filter(m=>Math.abs(m.t-contactT)<=420);
-  if(!win.length)return {miss:true,wave:[],reason:'動きが検出できませんでした'};
-  let peak=0,peakT=contactT;
-  for(const m of win){if(m.zone>peak){peak=m.zone;peakT=m.t;}}
-  if(peak<6)return {miss:true,wave:win,reason:'引く動きが検出できませんでした'};
-  const dtErr=peakT-contactT;
-  const timing=Math.max(0,1-Math.max(0,Math.abs(dtErr)-60)/300);
-  const after=win.filter(m=>m.t>contactT+40&&m.t<contactT+360);
-  const afterAvg=after.length?after.reduce((a,m)=>a+m.zone,0)/after.length:peak;
-  const cushion=Math.max(0,1-Math.abs(afterAvg/(peak||1)-0.45)/0.45);
-  return {miss:false,q:timing*0.55+cushion*0.45,timing,cushion,point:null,posture:null,dtErr,wave:win};
-}
-let tapDown=null,tapUp=null;
-function judgeTap(contactT){
-  if(tapDown==null)return {miss:true,wave:[],reason:'タップがありませんでした'};
-  const dtErr=tapDown-contactT;
-  const timing=Math.max(0,1-Math.max(0,Math.abs(dtErr)-70)/300);
-  const hold=(tapUp??performance.now())-tapDown;
-  const cushion=Math.max(0,1-Math.abs(hold-200)/260);
-  return {miss:timing<=0,q:timing*0.55+cushion*0.45,timing,cushion,point:null,posture:null,dtErr,wave:[]};
-}
-
-/* ---------- リプレイ録画 ---------- */
-const REC_MAX=48, REC_INT=90;
-let recPool=[],recIdx=0,lastRec=0,recW=0,recH=0,lastClip=null;
-function initRec(){
-  const s=Math.sqrt(90000/(W*H));
-  recW=Math.max(120,Math.round(W*s));recH=Math.max(120,Math.round(H*s));
-  recPool=Array.from({length:REC_MAX},()=>({c:Object.assign(document.createElement('canvas'),{width:recW,height:recH}),t:0,pose:null,ballP:null,zone:null}));
-}
-function capture(now){
-  if(!camReady||!recPool.length)return;
-  if(now-lastRec<REC_INT)return;
-  lastRec=now;
-  const src=coverSrcRect();if(!src)return;
-  const f=recPool[recIdx%REC_MAX];recIdx++;
-  const c=f.c.getContext('2d');
-  c.save();c.translate(recW,0);c.scale(-1,1);
-  c.drawImage(video,src.sx,src.sy,src.sw,src.sh,0,0,recW,recH);
-  c.restore();
-  f.t=now;
-  f.pose=(lastPose&&lastPose.present)?JSON.parse(JSON.stringify(lastPose.pts)):null;
-  if(ball){const p=project(ball.x,ball.y,ball.z);f.ballP={x:p.sx,y:p.sy,r:Math.max(3,R*p.s)};}
-  else f.ballP=null;
-  f.zone={...zoneRect};
-}
-function snapshotClip(){
-  if(!camReady)return;
-  const frames=recPool.filter(f=>f.t>=contactAt-1500&&f.t>0).sort((a,b)=>a.t-b.t);
-  if(frames.length<4)return;
-  lastClip=frames.map(f=>{
-    const c=Object.assign(document.createElement('canvas'),{width:recW,height:recH});
-    c.getContext('2d').drawImage(f.c,0,0);
-    return {c,t:f.t,pose:f.pose,ballP:f.ballP,zone:f.zone};
-  });
-  $('btnReplay').classList.add('show');
-}
-let replayTimer=null;
-function playReplay(){
-  if(!lastClip)return;
-  const ov=$('replayOv');ov.classList.add('show');
-  const rc=$('replayC');
-  const scale=Math.min((innerWidth*0.94)/recW,(innerHeight*0.74)/recH);
-  rc.width=recW*scale;rc.height=recH*scale;
-  const c=rc.getContext('2d');
-  const k=rc.width/W; // スクリーン座標→リプレイ座標
-  let i=0,loops=0;
-  clearInterval(replayTimer);
-  replayTimer=setInterval(()=>{
-    const f=lastClip[i];
-    c.clearRect(0,0,rc.width,rc.height);
-    c.drawImage(f.c,0,0,rc.width,rc.height);
-    if(f.pose){ // 骨格
-      c.strokeStyle='rgba(93,217,193,.95)';c.lineWidth=2.5;
-      for(const[a,b]of BONES){
-        c.beginPath();c.moveTo(f.pose[a].x*k,f.pose[a].y*k);c.lineTo(f.pose[b].x*k,f.pose[b].y*k);c.stroke();
-      }
-      c.fillStyle='#5DD9C1';
-      for(const key in f.pose){c.beginPath();c.arc(f.pose[key].x*k,f.pose[key].y*k,3,0,Math.PI*2);c.fill();}
-    }
-    if(f.ballP){ // ボール
-      c.fillStyle='#F2F5F0';c.beginPath();c.arc(f.ballP.x*k,f.ballP.y*k,Math.max(3,f.ballP.r*k),0,Math.PI*2);c.fill();
-      c.strokeStyle='rgba(0,0,0,.4)';c.stroke();
-    }
-    // タイムライン
-    c.fillStyle='rgba(242,245,240,.25)';c.fillRect(0,rc.height-4,rc.width,4);
-    c.fillStyle='#C8FF4D';c.fillRect(0,rc.height-4,rc.width*(i/(lastClip.length-1)),4);
-    i++;
-    if(i>=lastClip.length){i=0;loops++;if(loops>=2){clearInterval(replayTimer);}}
-  },REC_INT*2);
-}
-$('btnReplay').onclick=playReplay;
-$('btnReplayClose').onclick=()=>{clearInterval(replayTimer);$('replayOv').classList.remove('show');};
-
-/* ---------- ゲーム状態 ---------- */
-let gameMode='challenge', inputMode='cam';
-let state='menu';   // menu / loading / positioning / countdown / play / result
-let phase='wait', phaseT=0, contactAt=0;
-let playing=false, ball=null, level=0;
-let score=0,streak=0,best=+(store.get('tcc_best')||0);
-let trapResult=null, analysisData=null, settleT=0, kickT=null, kickDeadline=0;
-let zoneRect={x:.5,y:.7,r:.11};
-let particles=[];
-let ballNum=0; const CHALLENGE_BALLS=10;
-let sessionTrapQs=[],sessionKickTs=[],sessionOuts=0;
-let sessionSuccess=0, sessionStart=0, lastTimeUpd=0;
-let posOkSince=null, cdEnd=0, cdLast=4;
-
-function serve(){
-  ballNum++;
-  const aimSx=(inputMode==='cam'&&lastPose&&lastPose.present)?(lastPose.pts.lh.x+lastPose.pts.rh.x)/2:null;
-  if(aimSx!=null)CIRCLE.cx=Math.max(-1.4,Math.min(1.4,unprojectX(aimSx,CIRCLE.cz)));
-  ball=makeServe(level,aimSx);
-  phase='flight';
-  const p=project(ball.targetX, ball.targetY, CIRCLE.cz+0.1);
-  zoneRect={x:Math.min(.92,Math.max(.08,p.sx/W)), y:Math.min(.88,p.sy/H), r:0.11};
-  contactAt=performance.now()+ball.T*1000;
-  tapDown=tapUp=null;trapResult=null;kickT=null;
-  $('btnReplay').classList.remove('show');
-  const part=ball.targetY>0.95?'胸':ball.targetY>0.42?'腿':'インサイド';
-  const dir=ball.side>0?'画面右':'画面左';
-  coach(`BALL ${gameMode==='challenge'?ballNum+'/'+CHALLENGE_BALLS:ballNum} — <b>${dir}</b>から! <b>${part}</b>でトラップ!`);
-  updateHUD();
-  beep(660,0.07,0.08);
-}
-function resolveTrap(){
-  const r=judgeTrap(contactAt);
-  trapResult=r;
-  if(r.miss){
-    verdict('MISS','var(--red)','ボールに触れず');
-    coach(r.reason+'。<b>ボールの正面に体を運んで</b>構えましょう。');
-    streak=0;sessionTrapQs.push(0);
-    analysisData={q:0,timing:0,cushion:0,point:null,posture:null,wave:r.wave};
-    phase='roll';phaseT=performance.now();
-    setTimeout(snapshotClip,600);
+function renderBest5() {
+  const list = $("best5-list");
+  const hist = getScoreHistory(gameMode, difficulty);
+  if (hist.length === 0) {
+    list.innerHTML = `<div class="best5-empty">まだ記録がありません。プレーしてスコアを刻もう。</div>`;
     return;
   }
-  const q=r.q;sessionTrapQs.push(q);
-  const speed=0.35+(1-q)*3.4;
-  const az=Math.random()*Math.PI*2;
-  ball.x=unprojectX(zoneRect.x*W,CIRCLE.cz+0.1);ball.z=CIRCLE.cz+0.1;ball.y=Math.max(R,ball.targetY*0.5);
-  ball.vx=Math.cos(az)*speed*0.8;
-  ball.vz=Math.sin(az)*speed*0.8;
-  ball.vy=q>0.6?0.4:1.3+(1-q);
-  let g,c;
-  if(q>0.78){g='PERFECT';c='var(--volt)';coach('完璧な吸収! すぐ<b>キック準備</b>!');beep(1100,0.12);}
-  else if(q>0.55){g='GOOD';c='var(--teal)';coach('良いタッチ。<b>円内に残るか</b>…!');beep(880,0.1);}
-  else{g='HARD TOUCH';c='var(--amber)';beep(330,0.12);
-    coach(r.dtErr<-120?'<b>早すぎ</b>。跳ねた!':r.dtErr>120?'<b>遅れた</b>。跳ね返りが強い!':'硬い。<b>触る瞬間に脱力</b>を。');}
-  verdict(g,c,'');
-  if(!reduceMotion)burst(project(ball.x,ball.y,ball.z), q>0.78?'#C8FF4D':q>0.55?'#5DD9C1':'#FFB454');
-  analysisData=r;
-  phase='roll';phaseT=performance.now();
-  setTimeout(snapshotClip,900);
-}
-function onOut(){
-  verdict('OUT','var(--red)','円外 — 0点');
-  coach('コントロールできず円外へ。<b>吸収の質</b>が跳ね返りを決めます。');
-  streak=0;sessionOuts++;updateHUD();
-  beep(220,0.2);
-  if(analysisData){showAnalysis(analysisData);$('kickTime').textContent='—';}
-  phase='after';phaseT=performance.now();
-}
-function onSettled(){
-  phase='kick';settleT=performance.now();
-  kickDeadline=settleT+3500;
-  sessionSuccess++;updateHUD();
-  coach('<b>KICK!</b> '+(inputMode==='cam'?'素早く蹴る動きを!':inputMode==='sensor'?'スマホを鋭く振れ!':'今すぐタップ!'));
-  const p=project(ball.x,ball.y,ball.z);
-  zoneRect={x:Math.min(.92,Math.max(.08,p.sx/W)), y:Math.min(.9,p.sy/H), r:0.1};
-  beep(990,0.09);
-}
-function detectKick(now){
-  if(inputMode==='tap')return false;
-  if(now-settleT<150)return false;
-  if(inputMode==='sensor'){
-    const m=motionBuf.length?motionBuf[motionBuf.length-1]:null;
-    return m&&m.zone>14;
-  }
-  // カメラ: 足首/つま先の速度スパイク
-  const e2=lastPose;
-  if(!e2||!e2.present)return false;
-  const e1=[...poseBuf].reverse().find(p=>p.present&&p.t<e2.t-15);
-  if(!e1)return false;
-  return partSpeed(e1,e2,'foot')>H*1.05;
-}
-function onKick(now){
-  kickT=(now-settleT)/1000;sessionKickTs.push(kickT);
-  const bonus=Math.round(Math.max(5,50-Math.max(0,kickT-0.5)/2.5*45));
-  const trapPts=Math.round(trapResult.q*100);
-  const mult=1+streak*0.08;
-  const pts=Math.round((trapPts+bonus)*mult);
-  score+=pts;streak++;level=Math.min(10,Math.floor(score/400));
-  if(score>best){best=score;store.set('tcc_best',best);}
-  verdict('+'+pts,'var(--volt)',`TRAP ${trapPts} + KICK ${bonus}${streak>1?' ×'+mult.toFixed(2):''}`);
-  showAnalysis(analysisData);
-  $('kickTime').textContent=kickT.toFixed(2)+'s'+(kickT<0.8?' ⚡FAST':kickT<1.6?'':' …SLOW');
-  updateHUD();beep(1320,0.14);
-  ball.vz=7+Math.random()*3;ball.vy=2.5;ball.vx=(Math.random()-0.5)*3;
-  if(!reduceMotion)burst(project(ball.x,ball.y,ball.z),'#C8FF4D');
-  phase='after';phaseT=performance.now();
-}
-function onKickTimeout(){
-  kickT=null;sessionKickTs.push(3.5);
-  const trapPts=Math.round(trapResult.q*50);
-  score+=trapPts;streak=0;
-  if(score>best){best=score;store.set('tcc_best',best);}
-  verdict('TOO SLOW','var(--amber)',`TRAP ${trapPts}のみ`);
-  coach('キックが遅い! <b>止めた瞬間に蹴る</b>意識を。');
-  showAnalysis(analysisData);
-  $('kickTime').textContent='TIMEOUT';
-  updateHUD();beep(220,0.18);
-  phase='after';phaseT=performance.now();
-}
-function nextOrResult(now){
-  if(gameMode==='challenge'&&ballNum>=CHALLENGE_BALLS){showResult();return;}
-  phase='wait';phaseT=now;
-}
-function showResult(){
-  state='result';playing=false;
-  const avgQ=sessionTrapQs.length?sessionTrapQs.reduce((a,b)=>a+b,0)/sessionTrapQs.length:0;
-  const avgK=sessionKickTs.length?sessionKickTs.reduce((a,b)=>a+b,0)/sessionKickTs.length:3.5;
-  const rank=score>=1200?'S':score>=900?'A':score>=550?'B':'C';
-  const totalT=(performance.now()-sessionStart)/1000;
-  $('rRank').textContent=rank;
-  $('rScore').textContent=score+' pts';
-  $('rBest').textContent='BEST '+best+' ・ TIME '+Math.floor(totalT/60)+':'+String(Math.floor(totalT%60)).padStart(2,'0')+' ・ 成功 '+sessionSuccess+'/'+CHALLENGE_BALLS;
-  $('rTrapBar').style.width=Math.round(avgQ*100)+'%';$('rTrapPct').textContent=Math.round(avgQ*100)+'%';
-  const kScore=Math.max(0,1-(avgK-0.5)/3);
-  $('rKickBar').style.width=Math.round(kScore*100)+'%';$('rKickPct').textContent=avgK.toFixed(2)+'s';
-  $('rOutBar').style.width=(sessionOuts/CHALLENGE_BALLS*100)+'%';$('rOutPct').textContent=sessionOuts+'回';
-  $('resultOv').classList.remove('hidden');
-  coach('チャレンジ終了! ランク <b>'+rank+'</b>');
+  list.innerHTML = hist.map((h, i) => `
+    <div class="best5-row">
+      <span class="best5-rank">${i + 1}</span>
+      <span class="best5-score">${h.score}</span>
+      <span class="best5-date">${h.date}</span>
+    </div>
+  `).join("");
 }
 
-function verdict(main,color,sub){
-  const v=$('verdict');
-  v.innerHTML=main+(sub?`<small>${sub}</small>`:'');
-  v.style.color=color;
-  v.classList.remove('show');void v.offsetWidth;v.classList.add('show');
+/* ---------------- 効果音(シリーズ共通) ---------------- */
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+  }
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
 }
-function updateHUD(){
-  $('score').textContent=score;
-  $('succ').textContent=sessionSuccess+'/'+(gameMode==='challenge'?CHALLENGE_BALLS:Math.max(ballNum,0));
+function playKickSound(perfect) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(perfect ? 340 : 240, t);
+  osc.frequency.exponentialRampToValueAtTime(60, t + 0.16);
+  gain.gain.setValueAtTime(0.5, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t); osc.stop(t + 0.22);
+  if (perfect) {
+    const o2 = audioCtx.createOscillator(); const g2 = audioCtx.createGain();
+    o2.type = "triangle";
+    o2.frequency.setValueAtTime(880, t + 0.02);
+    o2.frequency.exponentialRampToValueAtTime(1760, t + 0.12);
+    g2.gain.setValueAtTime(0.18, t + 0.02);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    o2.connect(g2).connect(audioCtx.destination);
+    o2.start(t + 0.02); o2.stop(t + 0.27);
+  }
 }
-function coach(html){$('coach').innerHTML=html;}
-function showAnalysis(r){
-  const a=$('analysis');a.classList.add('show');
-  const set=(b,p,v)=>{
-    if(v==null){$(b).style.width='0%';$(p).textContent='—';return;}
-    $(b).style.width=Math.round(v*100)+'%';$(p).textContent=Math.round(v*100)+'%';
+function playComboSound(n) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  [523.25, 659.25, 783.99].forEach((f, i) => {
+    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    o.type = "square"; o.frequency.value = f * (1 + Math.min(n, 20) * 0.01);
+    g.gain.setValueAtTime(0.08, t + i * 0.07);
+    g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.07 + 0.18);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(t + i * 0.07); o.stop(t + i * 0.07 + 0.2);
+  });
+}
+function playBeep(freq, dur = 0.12, vol = 0.2) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+  o.type = "sine"; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function playWhistle() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  [0, 0.28].forEach((delay, i) => {
+    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    o.type = "square"; o.frequency.value = i === 0 ? 2200 : 2400;
+    g.gain.setValueAtTime(0.12, t + delay);
+    g.gain.setValueAtTime(0.12, t + delay + 0.18);
+    g.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.24);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(t + delay); o.stop(t + delay + 0.26);
+  });
+}
+
+/* ---------------- カメラ ---------------- */
+async function startCamera() {
+  stopCamera();
+  const constraints = {
+    audio: false,
+    video: {
+      facingMode: { ideal: facingMode },
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+    },
   };
-  set('bPosture','pPosture',r.posture);set('bPoint','pPoint',r.point);
-  set('bTiming','pTiming',r.timing);set('bCushion','pCushion',r.cushion);
-  $('kickTime').textContent='…';
-  const wc=$('wave'),wx=wc.getContext('2d');wx.clearRect(0,0,wc.width,wc.height);
-  wx.strokeStyle='rgba(242,245,240,.25)';wx.beginPath();
-  const cx=wc.width/2;wx.moveTo(cx,0);wx.lineTo(cx,wc.height);wx.stroke();
-  if(r.wave&&r.wave.length>1){
-    const t0=contactAt-460, span=920;
-    const max=Math.max(8,...r.wave.map(m=>m.zone));
-    wx.strokeStyle='#C8FF4D';wx.lineWidth=1.6;wx.beginPath();
-    r.wave.forEach((m,i)=>{
-      const x=(m.t-t0)/span*wc.width, y=wc.height-3-(m.zone/max)*(wc.height-6);
-      i?wx.lineTo(x,y):wx.moveTo(x,y);
+  stream = await navigator.mediaDevices.getUserMedia(constraints);
+  video.srcObject = stream;
+  await new Promise((res) => {
+    if (video.readyState >= 2) return res();
+    video.onloadeddata = () => res();
+  });
+  await video.play();
+  const track = stream.getVideoTracks()[0];
+  const settings = track.getSettings ? track.getSettings() : {};
+  const actualFacing = settings.facingMode || facingMode;
+  mirrored = actualFacing === "user";
+  video.classList.toggle("mirrored", mirrored);
+}
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; }
+}
+
+/* ---------------- 骨格検出モデル ---------------- */
+async function loadModel() {
+  if (poseLandmarker) return;
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+  );
+  poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath:
+        "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+      delegate: "GPU",
+    },
+    runningMode: "VIDEO",
+    numPoses: 1,
+    minPoseDetectionConfidence: 0.5,
+    minPosePresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+  });
+}
+
+/* ---------------- 座標変換 (object-fit: cover 対応) ---------------- */
+function landmarkToScreen(lm) {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const cw = canvas.width, ch = canvas.height;
+  if (!vw || !vh) return { x: 0, y: 0 };
+  const scale = Math.max(cw / vw, ch / vh);
+  const dispW = vw * scale, dispH = vh * scale;
+  const offX = (cw - dispW) / 2, offY = (ch - dispH) / 2;
+  let x = lm.x * dispW + offX;
+  const y = lm.y * dispH + offY;
+  if (mirrored) x = cw - x;
+  return { x, y };
+}
+
+/* ---------------- 骨格追跡 ---------------- */
+function footPoint(landmarks, ankleIdx, footIdx, heelIdx) {
+  const a = landmarks[ankleIdx], f = landmarks[footIdx], h = landmarks[heelIdx];
+  const vis = (p) => (p && (p.visibility === undefined || p.visibility > 0.4));
+  if (!vis(a) && !vis(f)) return null;
+  const pts = [];
+  if (vis(a)) pts.push(landmarkToScreen(a));
+  if (vis(f)) { const p = landmarkToScreen(f); pts.push(p, p); }
+  if (vis(h)) pts.push(landmarkToScreen(h));
+  const x = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const y = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+  return { x, y };
+}
+function midScreen(lms, i1, i2) {
+  const a = lms[i1], b = lms[i2];
+  const vis = (p) => (p && (p.visibility === undefined || p.visibility > 0.4));
+  if (!vis(a) || !vis(b)) return null;
+  const pa = landmarkToScreen(a), pb = landmarkToScreen(b);
+  return { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
+}
+function singleScreen(lms, idx) {
+  const p = lms[idx];
+  const vis = (q) => (q && (q.visibility === undefined || q.visibility > 0.4));
+  if (!vis(p)) return null;
+  return landmarkToScreen(p);
+}
+function angleDeg(a, b, c) {
+  const v1 = { x: a.x - b.x, y: a.y - b.y }, v2 = { x: c.x - b.x, y: c.y - b.y };
+  const d = (v1.x * v2.x + v1.y * v2.y) / ((Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y)) || 1e-6);
+  return Math.acos(Math.max(-1, Math.min(1, d))) * 180 / Math.PI;
+}
+function updatePose(nowMs) {
+  if (!poseLandmarker || video.readyState < 2) return;
+  if (video.currentTime === lastVideoTime) return;
+  lastVideoTime = video.currentTime;
+  let result;
+  try {
+    result = poseLandmarker.detectForVideo(video, nowMs);
+  } catch { return; }
+  const lms = result && result.landmarks && result.landmarks[0];
+  const prevParts = bodyParts;
+  prevFeet = { left: feet.left, right: feet.right };
+  if (!lms) { feet = { left: null, right: null }; bodyParts = {}; return; }
+  poseSeenAt = nowMs;
+  const dt = Math.max(16, nowMs - (feet.leftSeenAt || nowMs - 33)) / 1000;
+  const withSpeed = (cur, prev) => {
+    if (!cur) return null;
+    if (!prev) return { ...cur, speed: 0, velX: 0, velY: 0 };
+    const velX = (cur.x - prev.x) / dt;
+    const velY = (cur.y - prev.y) / dt;
+    return { ...cur, speed: Math.hypot(velX, velY), velX, velY };
+  };
+  const footL = footPoint(lms, LM.L_ANKLE, LM.L_FOOT, LM.L_HEEL);
+  const footR = footPoint(lms, LM.R_ANKLE, LM.R_FOOT, LM.R_HEEL);
+  if (footL) footL.axis = { heel: singleScreen(lms, LM.L_HEEL), toe: singleScreen(lms, LM.L_FOOT) };
+  if (footR) footR.axis = { heel: singleScreen(lms, LM.R_HEEL), toe: singleScreen(lms, LM.R_FOOT) };
+  const thighL = midScreen(lms, LM.L_HIP, LM.L_KNEE);
+  const thighR = midScreen(lms, LM.R_HIP, LM.R_KNEE);
+  // 胸: 両肩の中点から腰方向へ少し下げた点
+  const shoulderMid = midScreen(lms, LM.L_SHOULDER, LM.R_SHOULDER);
+  const hipMid = midScreen(lms, LM.L_HIP, LM.R_HIP);
+  let chest = null;
+  if (shoulderMid && hipMid) {
+    chest = { x: shoulderMid.x + (hipMid.x - shoulderMid.x) * 0.35, y: shoulderMid.y + (hipMid.y - shoulderMid.y) * 0.35 };
+  }
+  bodyParts = {
+    footL: withSpeed(footL, prevParts.footL),
+    footR: withSpeed(footR, prevParts.footR),
+    thighL: withSpeed(thighL, prevParts.thighL),
+    thighR: withSpeed(thighR, prevParts.thighR),
+    chest: withSpeed(chest, prevParts.chest),
+  };
+  feet = { left: bodyParts.footL, right: bodyParts.footR, leftSeenAt: nowMs };
+
+  // 体アンカー(地面・体高・腰位置)
+  const nose = singleScreen(lms, LM.NOSE);
+  const ankles = [singleScreen(lms, LM.L_ANKLE), singleScreen(lms, LM.R_ANKLE)].filter(Boolean);
+  if (ankles.length) {
+    const g = Math.max(...ankles.map((a) => a.y));
+    anchorGround = anchorGround ? anchorGround * 0.8 + g * 0.2 : g;
+  }
+  if (nose && anchorGround) {
+    const bh = Math.max(120 * DPR(), anchorGround - nose.y);
+    anchorBodyH = anchorBodyH ? anchorBodyH * 0.85 + bh * 0.15 : bh;
+  }
+  if (hipMid) anchorHipX = hipMid.x;
+
+  // 膝角度(姿勢判定用)
+  let knee = null;
+  const hipL = singleScreen(lms, LM.L_HIP), kneeL = singleScreen(lms, LM.L_KNEE), ankleL = singleScreen(lms, LM.L_ANKLE);
+  const hipR = singleScreen(lms, LM.R_HIP), kneeR = singleScreen(lms, LM.R_KNEE), ankleR = singleScreen(lms, LM.R_ANKLE);
+  const kneeAngles = [];
+  if (hipL && kneeL && ankleL) kneeAngles.push(angleDeg(hipL, kneeL, ankleL));
+  if (hipR && kneeR && ankleR) kneeAngles.push(angleDeg(hipR, kneeR, ankleR));
+  if (kneeAngles.length) knee = kneeAngles.reduce((a, b) => a + b, 0) / kneeAngles.length;
+
+  // 判定用スナップショット
+  poseBuf.push({
+    t: nowMs,
+    footL: bodyParts.footL, footR: bodyParts.footR,
+    thighL: bodyParts.thighL, thighR: bodyParts.thighR,
+    chest: bodyParts.chest,
+    knee, hipX: hipMid ? hipMid.x : null,
+  });
+  while (poseBuf.length && nowMs - poseBuf[0].t > 2200) poseBuf.shift();
+}
+function partCandidates(entry, part) {
+  if (part === "CHEST") return [entry.chest].filter(Boolean);
+  if (part === "THIGH") return [entry.thighL, entry.thighR].filter(Boolean);
+  return [entry.footL, entry.footR].filter(Boolean);
+}
+function pickRequiredPart() {
+  const r = Math.random();
+  let acc = 0;
+  for (const [k, w] of PART_WEIGHTS) { acc += w; if (r < acc) return k; }
+  return "FOOT";
+}
+
+/* ---------------- タッチ部位6分類(シリーズ共通の足軸判定) ---------------- */
+function classifyTouch(ballPt, foot, side) {
+  const ax = foot.axis;
+  const fallback = { key: "INSTEP", def: TOUCH_TYPES.INSTEP };
+  if (!(ax && ax.heel && ax.toe)) return fallback;
+  const ex = ax.toe.x - ax.heel.x, ey = ax.toe.y - ax.heel.y;
+  const len2 = ex * ex + ey * ey;
+  if (len2 < 4) return fallback;
+  const len = Math.sqrt(len2);
+  const bx = ballPt.x - ax.heel.x, by = ballPt.y - ax.heel.y;
+  const t = (bx * ex + by * ey) / len2;
+  const perp = (ex * by - ey * bx) / len;
+  const other = side === "L" ? feet.right : feet.left;
+  const refX = other ? other.x : canvas.width / 2;
+  const medialSignX = Math.sign(refX - foot.x) || 1;
+  if (t < 0.18) return { key: "HEEL", def: TOUCH_TYPES.HEEL };
+  if (Math.abs(perp) <= len * 0.30) return { key: "INSTEP", def: TOUCH_TYPES.INSTEP };
+  const ballSideX = Math.sign(ballPt.x - foot.x) || 1;
+  const isMedial = ballSideX === medialSignX;
+  const isFront = t > 0.8;
+  const key = isMedial ? (isFront ? "INFRONT" : "INSIDE") : (isFront ? "OUTFRONT" : "OUTSIDE");
+  return { key, def: TOUCH_TYPES[key] };
+}
+
+/* ---------------- 重力(px/s^2) ---------------- */
+function gAccel() {
+  const cfg = DIFFICULTY[difficulty];
+  if (cfg.real && anchorBodyH) {
+    const pxPerMeter = anchorBodyH / 1.7;   // 骨格の体高≒1.7mでpx/m換算
+    return 9.8 * pxPerMeter;
+  }
+  return cfg.gravityF * 1600 * DPR();
+}
+
+/* ---------------- サーブ(逆サイドから飛来) ---------------- */
+function serve(nowMs) {
+  const cfg = DIFFICULTY[difficulty];
+  const W = canvas.width, H = canvas.height;
+  const bodyH = anchorBodyH || H * 0.5;
+  const ground = anchorGround || H * 0.85;
+  const hipX = anchorHipX || W / 2;
+
+  // サークル: プレイヤー中心
+  circleCx = hipX;
+  circleR = bodyH * cfg.circle;
+
+  // プレイヤーの逆サイドから進入
+  const dir = hipX < W / 2 ? -1 : 1;              // -1: 右→左へ飛ぶ, 1: 左→右へ飛ぶ
+  const startX = dir === -1 ? W + 60 * DPR() : -60 * DPR();
+
+  // 指定部位: 実際に検出した部位の座標を狙う
+  requiredPart = pickRequiredPart();
+  const cands = partCandidates(poseBuf[poseBuf.length - 1] || {}, requiredPart);
+  let tx, ty;
+  if (cands.length) {
+    const p = cands[Math.floor(Math.random() * cands.length)];
+    tx = p.x - dir * (0.08 + Math.random() * 0.22) * bodyH;  // 進入側に少しリード
+    ty = p.y + (Math.random() - 0.5) * 0.06 * bodyH;
+  } else {
+    const zone = { FOOT: 0.06, THIGH: 0.38, CHEST: 0.72 }[requiredPart];
+    tx = hipX - dir * 0.15 * bodyH;
+    ty = ground - bodyH * zone;
+  }
+  tx = Math.max(W * 0.08, Math.min(W * 0.92, tx));
+  ty = Math.max(H * 0.15, Math.min(ground - 4, ty));
+
+  const T = Math.max(1.1, cfg.flight + (Math.random() * 2 - 1) * cfg.flightVar);
+  const g = gAccel();
+  const sy = ground - bodyH * (0.02 + Math.random() * 0.25);
+  const type = requiredPart === "FOOT" && Math.random() < 0.45 ? "ground" : "air";
+  const r = Math.max(10, bodyH * 0.075);
+
+  ball = {
+    x: startX, y: type === "ground" ? ground - r : sy,
+    vx: (tx - startX) / T,
+    vy: type === "ground" ? 0 : (ty - (sy)) / T - 0.5 * g * T,
+    r, tx, ty, ground, type,
+    rot: 0, trail: [],
+  };
+  if (type === "ground") { ball.ty = ground - r; ball.vy = 0; }
+  contactAt = nowMs + T * 1000;
+  trapResult = null;
+  sub = "flight";
+  playBeep(660, 0.07, 0.1);
+  addPopup(tx, ty - bodyH * 0.18, `${PARTS[requiredPart].label}でトラップ!`, PARTS[requiredPart].color, 1400);
+}
+
+/* ---------------- ボール物理 ---------------- */
+function updateBall(dt, nowMs) {
+  if (!ball) return;
+  const g = gAccel();
+  if (sub === "flight") {
+    ball.x += ball.vx * dt;
+    if (ball.type === "ground") {
+      // グラウンダー: 地面を小さく弾みながら
+      ball.vy += g * dt;
+      ball.y += ball.vy * dt;
+      if (ball.y > ball.ground - ball.r) { ball.y = ball.ground - ball.r; ball.vy = -Math.abs(ball.vy) * 0.35 - 30; }
+    } else {
+      ball.vy += g * dt;
+      ball.y += ball.vy * dt;
+    }
+    ball.rot += (ball.vx / (ball.r * 2)) * dt;
+    if (nowMs >= contactAt) { ball.x = ball.tx; ball.y = ball.ty; resolveTrap(nowMs); }
+  } else if (sub === "roll" || sub === "after" || sub === "kick") {
+    ball.vy += g * dt;
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+    if (ball.y > ball.ground - ball.r && ball.vy > 0) {
+      ball.y = ball.ground - ball.r;
+      ball.vy *= -0.45;
+      if (Math.abs(ball.vy) < 40) ball.vy = 0;
+    }
+    if (ball.y >= ball.ground - ball.r - 1) {
+      ball.vx *= Math.max(0, 1 - 1.7 * dt);   // 転がり摩擦
+    }
+    ball.rot += (ball.vx / (ball.r * 2)) * dt;
+  }
+  ball.trail.push({ x: ball.x, y: ball.y });
+  if (ball.trail.length > 20) ball.trail.shift();
+}
+
+/* ---------------- 判定(5要素) ---------------- */
+function judgeTrap(contactT) {
+  const bodyH = anchorBodyH || canvas.height * 0.5;
+  const hitR = bodyH * 0.22;
+  const bp = { x: ball.tx, y: ball.ty };
+  const win = poseBuf.filter((e) => Math.abs(e.t - contactT) <= 460);
+  if (win.length < 4) return { miss: true, reason: "骨格を検出できませんでした" };
+
+  const series = [];
+  for (const e of win) {
+    const cands = partCandidates(e, requiredPart);
+    if (!cands.length) continue;
+    let best = cands[0], bd = 1e9;
+    for (const c of cands) { const d = Math.hypot(c.x - bp.x, c.y - bp.y); if (d < bd) { bd = d; best = c; } }
+    series.push({ t: e.t, p: best, dist: bd, speed: best.speed || 0, knee: e.knee, hipX: e.hipX });
+  }
+  if (series.length < 4) return { miss: true, reason: `${PARTS[requiredPart].label}を検出できませんでした` };
+  const minDist = Math.min(...series.map((s) => s.dist));
+  if (minDist > hitR * 2.1) return { miss: true, reason: `${PARTS[requiredPart].label}がボールに届いていません`, wave: series };
+
+  // ③タイミング: 部位速度のピーク vs 接触時刻
+  let peak = 0, peakT = contactT;
+  for (const s of series) { if (s.speed > peak) { peak = s.speed; peakT = s.t; } }
+  const dtErr = peakT - contactT;
+  const timing = Math.max(0, 1 - Math.max(0, Math.abs(dtErr) - 70) / 300);
+  // ②ポイント: 接触時刻に最も近いフレームでの部位—ボール距離
+  const cE = series.reduce((a, s) => (Math.abs(s.t - contactT) < Math.abs(a.t - contactT) ? s : a));
+  const point = Math.max(0, 1 - cE.dist / (hitR * 1.5));
+  // ④吸収: 接触後の速度が滑らかに減衰(引き足)しているか
+  const after = series.filter((s) => s.t > contactT + 40 && s.t < contactT + 380);
+  const afterAvg = after.length ? after.reduce((a, s) => a + s.speed, 0) / after.length : peak;
+  const cushion = Math.max(0, 1 - Math.abs(afterAvg / (peak || 1) - 0.45) / 0.45);
+  // ①姿勢/構え: 到達前の膝屈曲 + ボールラインへの寄せ
+  const pre = poseBuf.filter((e) => e.t > contactT - 650 && e.t < contactT - 150);
+  let posture = 0.5;
+  const preKnees = pre.map((e) => e.knee).filter((k) => k != null);
+  const preHips = pre.map((e) => e.hipX).filter((x) => x != null);
+  if (preKnees.length || preHips.length) {
+    const kneeScore = preKnees.length
+      ? Math.max(0, Math.min(1, (172 - preKnees.reduce((a, b) => a + b, 0) / preKnees.length) / 30)) : 0.5;
+    const posScore = preHips.length
+      ? Math.max(0, 1 - Math.abs(preHips.reduce((a, b) => a + b, 0) / preHips.length - bp.x) / (bodyH * 0.9)) : 0.5;
+    posture = kneeScore * 0.5 + posScore * 0.5;
+  }
+  // 足トラップ時: タッチ部位6分類
+  let touchLabel = PARTS[requiredPart].label;
+  if (requiredPart === "FOOT") {
+    const fl = feet.left, fr = feet.right;
+    let foot = null, side = "L";
+    if (fl && fr) { foot = (Math.hypot(fl.x - bp.x, fl.y - bp.y) < Math.hypot(fr.x - bp.x, fr.y - bp.y)) ? fl : fr; side = foot === fl ? "L" : "R"; }
+    else { foot = fl || fr; side = fl ? "L" : "R"; }
+    if (foot) touchLabel = classifyTouch(bp, foot, side).def.label;
+  }
+  const q = timing * 0.3 + cushion * 0.3 + point * 0.2 + posture * 0.2;
+  return { miss: false, q, timing, cushion, point, posture, dtErr, touchLabel, wave: series };
+}
+function resolveTrap(nowMs) {
+  const r = judgeTrap(contactAt);
+  trapResult = r;
+  const bodyH = anchorBodyH || canvas.height * 0.5;
+  if (r.miss) {
+    addPopup(ball.x, ball.y - 60, "MISS", "#FF4757", 1200);
+    playBeep(220, 0.2);
+    vibrate(60);
+    misses++;
+    combo = 0; updateComboBanner();
+    sub = "roll";     // 素通り→そのまま円外へ
+    return;
+  }
+  // トラップ品質→跳ね返り
+  const q = r.q;
+  trapQs.push(q);
+  const vmax = bodyH * 2.6;
+  const speed = vmax * 0.12 + (1 - q) * vmax;
+  const dirOut = Math.random() < 0.5 ? -1 : 1;
+  ball.vx = dirOut * speed * (0.6 + Math.random() * 0.4);
+  ball.vy = -(1 - q) * bodyH * 1.1 - 40;
+  let grade, color;
+  if (q > 0.78) { grade = "PERFECT TOUCH"; color = "#FFC53D"; playBeep(1100, 0.14, 0.22); }
+  else if (q > 0.55) { grade = "GOOD"; color = "#1FE0D8"; playBeep(880, 0.1); }
+  else { grade = "HARD TOUCH"; color = "#FF9F43"; playBeep(330, 0.12); }
+  addPopup(ball.x, ball.y - 70, grade, color, 1100);
+  vibrate(25);
+  burst(ball.x, ball.y, color);
+  sub = "roll";
+}
+
+/* ---------------- OUT / 静止 / キック ---------------- */
+function ballOut() {
+  const wasMiss = trapResult && trapResult.miss;
+  addPopup(ball.x, Math.min(ball.y, ball.ground - 80), wasMiss ? "MISS" : "OUT", "#FF4757", 1300);
+  playBeep(220, 0.22);
+  vibrate([60, 40, 60]);
+  if (!wasMiss) outs++;   // MISSはresolveTrapで計上済み
+  combo = 0; updateComboBanner();
+  showAnalysisCard(trapResult, null);
+  sub = "after";
+  ballDoneAt = performance.now();
+}
+function ballSettled(nowMs) {
+  sub = "kick";
+  settleAt = nowMs;
+  kickDeadline = nowMs + DIFFICULTY[difficulty].kickLimit;
+  playBeep(990, 0.09, 0.18);
+  addPopup(ball.x, ball.y - 70, "KICK!", "#FFC53D", 900);
+}
+function detectKick(nowMs) {
+  if (nowMs - settleAt < 150) return null;
+  const bodyH = anchorBodyH || canvas.height * 0.5;
+  const minSpd = bodyH * 2.1;
+  for (const [f, side] of [[feet.left, "L"], [feet.right, "R"]]) {
+    if (!f || !f.speed) continue;
+    if (f.speed >= minSpd && Math.hypot(f.x - ball.x, f.y - ball.y) < bodyH * 0.42) {
+      return { foot: f, side, perfect: f.speed >= bodyH * 3.5 };
+    }
+  }
+  return null;
+}
+function onKick(nowMs, k) {
+  const kickT = (nowMs - settleAt) / 1000;
+  kickTs.push(kickT);
+  const cfg = DIFFICULTY[difficulty];
+  const trapPts = Math.round(trapResult.q * 100);
+  let kickBonus = Math.round(Math.max(5, 50 - Math.max(0, kickT - 0.5) / 2.5 * 45));
+  if (k.perfect) { kickBonus += 10; perfectKicks++; }
+  combo++;
+  maxCombo = Math.max(maxCombo, combo);
+  lastHitAt = nowMs;
+  const mult = cfg.multiplier * (1 + Math.min(combo - 1, 15) * 0.08);
+  const pts = Math.round((trapPts + kickBonus) * mult);
+  score += pts;
+  hits++;
+  scoreVal.textContent = String(score);
+  playKickSound(k.perfect);
+  vibrate(k.perfect ? [30, 30, 60] : 40);
+  if (combo >= 2) { playComboSound(combo); updateComboBanner(); }
+  addPopup(ball.x, ball.y - 80, `+${pts}`, "#FFC53D", 1300);
+  if (k.perfect) addPopup(ball.x, ball.y - 130, "PERFECT KICK", "#FFC53D", 1100);
+  burst(ball.x, ball.y, "#FFC53D");
+  // 蹴り出す
+  const dir = ball.x < canvas.width / 2 ? 1 : -1;
+  ball.vx = dir * (anchorBodyH || 400) * (3 + Math.random());
+  ball.vy = -(anchorBodyH || 400) * 1.4;
+  showAnalysisCard(trapResult, { t: kickT, perfect: k.perfect });
+  sub = "after";
+  ballDoneAt = nowMs;
+}
+function onKickTimeout(nowMs) {
+  slows++;
+  const trapPts = Math.round(trapResult.q * 50);   // 遅延: トラップ点半分のみ
+  score += trapPts;
+  scoreVal.textContent = String(score);
+  combo = 0; updateComboBanner();
+  playBeep(220, 0.18);
+  addPopup(ball.x, ball.y - 80, "TOO SLOW", "#FF9F43", 1300);
+  hits++;   // 円内には収めたので成功にはカウント
+  kickTs.push(DIFFICULTY[difficulty].kickLimit / 1000);
+  showAnalysisCard(trapResult, { t: null, perfect: false });
+  sub = "after";
+  ballDoneAt = nowMs;
+}
+let ballDoneAt = 0;
+
+/* ---------------- 解析カード(プレー後表示) ---------------- */
+let analysisHideTimer = null;
+function showAnalysisCard(r, kick) {
+  const set = (bar, pct, v) => {
+    if (v == null) { $(bar).style.width = "0%"; $(pct).textContent = "—"; return; }
+    $(bar).style.width = Math.round(v * 100) + "%";
+    $(pct).textContent = Math.round(v * 100) + "%";
+  };
+  const rr = r && !r.miss ? r : { posture: 0, point: 0, timing: 0, cushion: 0, touchLabel: "—", wave: r && r.wave };
+  set("an-posture", "an-posture-p", rr.posture);
+  set("an-point", "an-point-p", rr.point);
+  set("an-timing", "an-timing-p", rr.timing);
+  set("an-cushion", "an-cushion-p", rr.cushion);
+  $("an-touch").textContent = r && r.miss ? "MISS — " + (r.reason || "") : "タッチ: " + (rr.touchLabel || "—");
+  $("an-kick").textContent = !kick ? "—" : kick.t == null ? "TIMEOUT" : kick.t.toFixed(2) + "s" + (kick.perfect ? " ⚡" : "");
+  // 波形(部位速度)
+  const wc = $("an-wave"), wx = wc.getContext("2d");
+  wx.clearRect(0, 0, wc.width, wc.height);
+  wx.strokeStyle = "rgba(242,245,250,.25)";
+  wx.beginPath(); wx.moveTo(wc.width / 2, 0); wx.lineTo(wc.width / 2, wc.height); wx.stroke();
+  const wave = rr.wave;
+  if (wave && wave.length > 1) {
+    const t0 = contactAt - 460, span = 920;
+    const max = Math.max(1, ...wave.map((m) => m.speed || 0));
+    wx.strokeStyle = "#1FE0D8"; wx.lineWidth = 1.6;
+    wx.beginPath();
+    wave.forEach((m, i) => {
+      const x = (m.t - t0) / span * wc.width;
+      const y = wc.height - 3 - ((m.speed || 0) / max) * (wc.height - 6);
+      i ? wx.lineTo(x, y) : wx.moveTo(x, y);
     });
     wx.stroke();
   }
-  clearTimeout(showAnalysis.t);
-  showAnalysis.t=setTimeout(()=>a.classList.remove('show'),5000);
-}
-function burst(p,col){
-  for(let i=0;i<26;i++){
-    const a=Math.random()*Math.PI*2,v=2+Math.random()*4;
-    particles.push({x:p.sx,y:p.sy,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,life:1,col});
-  }
+  analysisEl.classList.add("show");
+  clearTimeout(analysisHideTimer);
+  analysisHideTimer = setTimeout(() => analysisEl.classList.remove("show"), 5200);
 }
 
-/* ---------- 描画 ---------- */
-function drawSkeleton(){
-  if(inputMode!=='cam'||!lastPose||!lastPose.present)return;
-  ctx.save();ctx.globalAlpha=0.55;
-  ctx.strokeStyle='#5DD9C1';ctx.lineWidth=2;
-  for(const[a,b]of BONES){
-    ctx.beginPath();ctx.moveTo(lastPose.pts[a].x,lastPose.pts[a].y);
-    ctx.lineTo(lastPose.pts[b].x,lastPose.pts[b].y);ctx.stroke();
+/* ---------------- コンボ・ポップアップ・パーティクル ---------------- */
+function updateComboBanner() {
+  if (combo >= 2) {
+    comboNum.textContent = String(combo);
+    comboBanner.classList.add("show");
+    clearTimeout(updateComboBanner.t);
+    updateComboBanner.t = setTimeout(() => comboBanner.classList.remove("show"), 1200);
+  } else {
+    comboBanner.classList.remove("show");
   }
-  ctx.fillStyle='#5DD9C1';
-  for(const k in lastPose.pts){
-    ctx.beginPath();ctx.arc(lastPose.pts[k].x,lastPose.pts[k].y,2.5,0,Math.PI*2);ctx.fill();
-  }
-  ctx.restore();
 }
-function drawPositionGuide(now,ok){
-  const gw=W*0.86,gh=H*0.72,gx=W/2,gy=H*0.56;
-  ctx.save();
-  ctx.strokeStyle=ok?'#C8FF4D':'rgba(242,245,240,.7)';
-  ctx.lineWidth=ok?4:2.5;
-  ctx.setLineDash([14,9]);ctx.lineDashOffset=-now/40;
-  ctx.strokeRect(gx-gw/2,gy-gh/2,gw,gh);
-  ctx.setLineDash([]);
-  ctx.fillStyle=ok?'#C8FF4D':'rgba(242,245,240,.85)';
-  ctx.font='bold 15px '+getComputedStyle(document.body).fontFamily;
-  ctx.textAlign='center';
-  ctx.fillText(ok?'骨格検知OK — そのまま静止':'画面の左端か右端に斜めに立ち、全身を映してください',gx,gy-gh/2-14);
-  if(ok&&posOkSince){
-    const pr=Math.min(1,(now-posOkSince)/800);
-    ctx.strokeStyle='#C8FF4D';ctx.lineWidth=5;
-    ctx.beginPath();ctx.arc(gx,gy+gh/2+34,20,-Math.PI/2,-Math.PI/2+pr*Math.PI*2);ctx.stroke();
-  }
-  ctx.restore();
+function addPopup(x, y, text, color, life = 1000) {
+  popups.push({ x, y, text, color, t0: performance.now(), life });
 }
-function drawCircle(now){
-  if(state!=='play')return;
-  const danger=ball&&(phase==='roll')&&planarDist(ball)>CIRCLE.r*0.72;
+function drawPopups(nowMs) {
+  popups = popups.filter((p) => nowMs - p.t0 < p.life);
+  for (const p of popups) {
+    const k = (nowMs - p.t0) / p.life;
+    ctx.save();
+    ctx.globalAlpha = 1 - k * k;
+    ctx.fillStyle = p.color;
+    ctx.font = `900 ${Math.round(26 * DPR())}px 'M PLUS 1', sans-serif`;
+    ctx.textAlign = "center";
+    ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 8;
+    ctx.fillText(p.text, p.x, p.y - k * 44 * DPR());
+    ctx.restore();
+  }
+}
+function burst(x, y, col) {
+  for (let i = 0; i < 22; i++) {
+    const a = Math.random() * Math.PI * 2, v = (2 + Math.random() * 4) * DPR();
+    particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2 * DPR(), life: 1, col });
+  }
+}
+function updateParticles(dt) {
+  particles = particles.filter((p) => p.life > 0);
+  for (const p of particles) {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.16 * DPR(); p.life -= dt * 1.5;
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.col;
+    ctx.fillRect(p.x, p.y, 3 * DPR(), 3 * DPR());
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---------------- 描画 ---------------- */
+function drawCircle(nowMs) {
+  if (!(phase === "playing") || !circleR) return;
+  const danger = ball && sub === "roll" && Math.abs(ball.x - circleCx) > circleR * 0.72;
+  const cy = anchorGround || canvas.height * 0.85;
   ctx.save();
-  ctx.strokeStyle=danger?'rgba(255,93,93,.95)':'rgba(242,245,240,.8)';
-  ctx.lineWidth=danger?3.5:2.5;
-  ctx.setLineDash([12,8]);ctx.lineDashOffset=-now/40;
+  ctx.strokeStyle = danger ? "rgba(255,71,87,.95)" : "rgba(242,245,250,.75)";
+  ctx.lineWidth = (danger ? 3.5 : 2.5) * DPR();
+  ctx.setLineDash([12 * DPR(), 8 * DPR()]);
+  ctx.lineDashOffset = -nowMs / 40;
   ctx.beginPath();
-  for(let i=0;i<=48;i++){
-    const a=i/48*Math.PI*2;
-    const p=project(CIRCLE.cx+Math.cos(a)*CIRCLE.r,0,CIRCLE.cz+Math.sin(a)*CIRCLE.r);
-    i?ctx.lineTo(p.sx,p.sy):ctx.moveTo(p.sx,p.sy);
-  }
-  ctx.stroke();ctx.setLineDash([]);
-  const lp=project(CIRCLE.cx,0,CIRCLE.cz-CIRCLE.r);
-  ctx.fillStyle=danger?'rgba(255,93,93,.9)':'rgba(242,245,240,.55)';
-  ctx.font='10px IBM Plex Mono';ctx.textAlign='center';
-  ctx.fillText('CONTROL CIRCLE R1.4m',lp.sx,lp.sy+18);
-  ctx.restore();
-}
-function drawZone(now){
-  // 落下点マーカーは廃止 — 実際のボールをトラップする。KICK!表示のみボール位置に出す
-  if(state!=='play'||phase!=='kick')return;
-  const bp=project(ball.x,ball.y,ball.z);
-  const r=Math.max(26,R*bp.s*2.2)+Math.sin(now/110)*4;
-  const remain=Math.max(0,(kickDeadline-now)/3500);
-  ctx.save();
-  ctx.translate(bp.sx,bp.sy);
-  ctx.strokeStyle='#FFB454';ctx.lineWidth=3;
-  ctx.setLineDash([10,7]);ctx.lineDashOffset=-now/28;
-  ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.stroke();
+  ctx.ellipse(circleCx, cy, circleR, circleR * 0.26, 0, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.setLineDash([]);
-  ctx.beginPath();ctx.arc(0,0,r*1.2,-Math.PI/2,-Math.PI/2+(1-remain)*Math.PI*2);ctx.stroke();
-  ctx.fillStyle='#FFB454';
-  ctx.font='bold 15px IBM Plex Mono';ctx.textAlign='center';
-  ctx.fillText('KICK!',0,-r-10);
+  ctx.fillStyle = danger ? "rgba(255,71,87,.9)" : "rgba(242,245,250,.55)";
+  ctx.font = `700 ${Math.round(10 * DPR())}px 'Rajdhani', sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText("CONTROL CIRCLE", circleCx, cy + circleR * 0.26 + 16 * DPR());
   ctx.restore();
 }
-function drawBall(now){
-  if(!ball||state!=='play')return;
+function drawFoot(f, nowMs) {
+  if (!f) return;
+  const r = Math.max(14 * DPR(), (anchorBodyH || 300) * 0.06);
+  const hot = (f.speed || 0) > (anchorBodyH || 300) * 2.1;
   ctx.save();
-  for(let i=1;i<ball.trail.length;i++){
-    const a=ball.trail[i-1],b=ball.trail[i];
-    const pa=project(a.x,a.y,a.z),pb=project(b.x,b.y,b.z);
-    ctx.strokeStyle=`rgba(200,255,77,${i/ball.trail.length*0.35})`;
-    ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(pa.sx,pa.sy);ctx.lineTo(pb.sx,pb.sy);ctx.stroke();
-  }
-  const sh=project(ball.x,0,ball.z);
-  const p=project(ball.x,ball.y,ball.z);
-  const r=Math.max(3,R*p.s);
-  ctx.fillStyle=`rgba(0,0,0,${Math.max(.08,.4-ball.y*0.18)})`;
-  ctx.beginPath();ctx.ellipse(sh.sx,sh.sy,r*0.95,r*0.32,0,0,Math.PI*2);ctx.fill();
-  const g=ctx.createRadialGradient(p.sx-r*0.35,p.sy-r*0.4,r*0.1,p.sx,p.sy,r);
-  g.addColorStop(0,'#ffffff');g.addColorStop(.75,'#dfe4dc');g.addColorStop(1,'#9aa39a');
-  ctx.fillStyle=g;
-  ctx.beginPath();ctx.arc(p.sx,p.sy,r,0,Math.PI*2);ctx.fill();
-  const rot=now/1000*(ball.spin||3)*1.8;
-  ctx.save();ctx.translate(p.sx,p.sy);ctx.rotate(rot);
-  ctx.fillStyle='rgba(20,30,24,.85)';
-  for(let i=0;i<3;i++){
-    const a=i*Math.PI*2/3;
-    ctx.beginPath();ctx.arc(Math.cos(a)*r*0.55,Math.sin(a)*r*0.55,r*0.22,0,Math.PI*2);ctx.fill();
-  }
-  ctx.restore();
-  ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.arc(p.sx,p.sy,r,0,Math.PI*2);ctx.stroke();
+  ctx.strokeStyle = hot ? "#FFC53D" : "rgba(35,224,255,.85)";
+  ctx.lineWidth = (hot ? 3.5 : 2.5) * DPR();
+  ctx.shadowColor = hot ? "rgba(255,197,61,.8)" : "rgba(35,224,255,.6)";
+  ctx.shadowBlur = 12 * DPR();
+  ctx.beginPath(); ctx.arc(f.x, f.y, r, 0, Math.PI * 2); ctx.stroke();
   ctx.restore();
 }
-function drawParticles(dt){
-  particles=particles.filter(p=>p.life>0);
-  for(const p of particles){
-    p.x+=p.vx;p.y+=p.vy;p.vy+=0.18;p.life-=dt*1.4;
-    ctx.fillStyle=p.col;ctx.globalAlpha=Math.max(0,p.life);
-    ctx.fillRect(p.x,p.y,3,3);
+function drawRequiredPart(nowMs) {
+  if (phase !== "playing" || sub !== "flight") return;
+  const e = poseBuf[poseBuf.length - 1];
+  if (!e) return;
+  const cands = partCandidates(e, requiredPart);
+  const col = PARTS[requiredPart].color;
+  for (const p of cands) {
+    const r = ((anchorBodyH || 300) * 0.1) + Math.sin(nowMs / 120) * 3 * DPR();
+    ctx.save();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2.5 * DPR();
+    ctx.setLineDash([6 * DPR(), 5 * DPR()]);
+    ctx.lineDashOffset = -nowMs / 30;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
   }
-  ctx.globalAlpha=1;
+}
+function drawKickPrompt(nowMs) {
+  if (sub !== "kick" || !ball) return;
+  const r = ball.r * 2 + Math.sin(nowMs / 110) * 4 * DPR();
+  const remain = Math.max(0, (kickDeadline - nowMs) / DIFFICULTY[difficulty].kickLimit);
+  ctx.save();
+  ctx.strokeStyle = "#FFC53D";
+  ctx.lineWidth = 3 * DPR();
+  ctx.setLineDash([10 * DPR(), 7 * DPR()]);
+  ctx.lineDashOffset = -nowMs / 28;
+  ctx.beginPath(); ctx.arc(ball.x, ball.y, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(ball.x, ball.y, r * 1.25, -Math.PI / 2, -Math.PI / 2 + (1 - remain) * Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = "#FFC53D";
+  ctx.font = `900 ${Math.round(15 * DPR())}px 'M PLUS 1', sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText("KICK!", ball.x, ball.y - r - 10 * DPR());
+  ctx.restore();
+}
+function drawBall(nowMs) {
+  if (!ball || phase !== "playing" || sub === "precount") return;
+  ctx.save();
+  // 軌跡
+  for (let i = 1; i < ball.trail.length; i++) {
+    ctx.strokeStyle = `rgba(35,224,255,${(i / ball.trail.length) * 0.35})`;
+    ctx.lineWidth = 1.5 * DPR();
+    ctx.beginPath();
+    ctx.moveTo(ball.trail[i - 1].x, ball.trail[i - 1].y);
+    ctx.lineTo(ball.trail[i].x, ball.trail[i].y);
+    ctx.stroke();
+  }
+  // 影
+  const shAlpha = Math.max(0.08, 0.35 - (ball.ground - ball.y) / (canvas.height * 0.5));
+  ctx.fillStyle = `rgba(0,0,0,${shAlpha})`;
+  ctx.beginPath();
+  ctx.ellipse(ball.x, ball.ground, ball.r * 0.95, ball.r * 0.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // 本体
+  const g = ctx.createRadialGradient(ball.x - ball.r * 0.35, ball.y - ball.r * 0.4, ball.r * 0.1, ball.x, ball.y, ball.r);
+  g.addColorStop(0, "#ffffff"); g.addColorStop(.75, "#E4E9F2"); g.addColorStop(1, "#9AA3B8");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2); ctx.fill();
+  // 回転パネル
+  ctx.save();
+  ctx.translate(ball.x, ball.y); ctx.rotate(ball.rot);
+  ctx.fillStyle = "rgba(13,18,32,.85)";
+  for (let i = 0; i < 3; i++) {
+    const a = i * Math.PI * 2 / 3;
+    ctx.beginPath(); ctx.arc(Math.cos(a) * ball.r * 0.55, Math.sin(a) * ball.r * 0.55, ball.r * 0.22, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+  ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.lineWidth = 1 * DPR();
+  ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
 }
 
-/* ---------- 正位置チェック & カウントダウン ---------- */
-function checkPosition(now){
-  const e=lastPose;
-  const ok=!!(e&&e.present
-    &&e.pts.la.vis>0.5&&e.pts.ra.vis>0.5&&e.pts.ls.vis>0.5&&e.pts.rs.vis>0.5
-    &&Math.max(e.pts.la.y,e.pts.ra.y)>H*0.55&&Math.max(e.pts.la.y,e.pts.ra.y)<H*0.99
-    &&Math.min(e.pts.ls.y,e.pts.rs.y)<H*0.55
-    &&(e.pts.lh.x+e.pts.rh.x)/2>W*0.06&&(e.pts.lh.x+e.pts.rh.x)/2<W*0.94);
-  if(ok){
-    if(posOkSince==null){posOkSince=now;beep(660,0.06,0.06);}
-    if(now-posOkSince>800)startCountdown(now);
-  }else posOkSince=null;
-  drawPositionGuide(now,ok);
+/* ---------------- リプレイ(1プレイ全録画) ---------------- */
+const recCanvas = document.createElement("canvas");
+let recCtx = null, mediaRecorder = null, recChunks = [], recMime = "", recBlobUrl = null;
+function recorderSupported() {
+  return typeof MediaRecorder !== "undefined" && recCanvas.captureStream;
 }
-function startCountdown(now){
-  state='play';playing=true;
-  sessionStart=now;lastTimeUpd=0;
-  phase='wait';phaseT=now;
-  coach('準備OK — <b>3カウント</b>でボールが出ます!');
+function pickRecMime() {
+  const candidates = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"];
+  for (const m of candidates) {
+    try { if (MediaRecorder.isTypeSupported(m)) return m; } catch {}
+  }
+  return "";
 }
-function tickCountdown(now){
-  const remain=Math.max(0,cdEnd-now);
-  const n=Math.ceil(remain/1000);
-  if(n!==cdLast&&n>0){cdLast=n;$('cdNum').textContent=n;beep(n===1?880:660,0.1);}
-  if(remain<=0){
-    $('countdown').classList.remove('show');
-    beep(1320,0.15);
-    serve();
-  }
+function startRecording() {
+  if (!recorderSupported()) return;
+  try {
+    const aspect = window.innerHeight / window.innerWidth;
+    recCanvas.width = 480;
+    recCanvas.height = Math.min(1040, Math.round(480 * aspect));
+    recCtx = recCanvas.getContext("2d");
+    if (recBlobUrl) { URL.revokeObjectURL(recBlobUrl); recBlobUrl = null; }
+    recChunks = [];
+    recMime = pickRecMime();
+    const s = recCanvas.captureStream(30);
+    mediaRecorder = new MediaRecorder(s, recMime ? { mimeType: recMime, videoBitsPerSecond: 2500000 } : undefined);
+    mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recChunks.push(e.data); };
+    mediaRecorder.start(1000);
+  } catch (e) { console.warn("録画を開始できませんでした", e); mediaRecorder = null; }
 }
-
-/* ---------- メインループ ---------- */
-let lastT=performance.now();
-function loop(now){
-  requestAnimationFrame(loop);
-  const dt=Math.min(0.033,(now-lastT)/1000);lastT=now;
-  if(inputMode==='cam')runPose(now);
-  capture(now);
-  ctx.clearRect(0,0,W,H);
-  drawSkeleton();
-
-  if(state==='positioning'){checkPosition(now);return;}
-  if(state!=='play')return;
-
-  if(now-lastTimeUpd>250){
-    lastTimeUpd=now;
-    const el=Math.max(0,(now-sessionStart)/1000);
-    $('timeVal').textContent=Math.floor(el/60)+':'+String(Math.floor(el%60)).padStart(2,'0');
-  }
-
-  if(phase==='flight'){
-    stepBall(ball,dt);
-    if(now>=contactAt)resolveTrap();
-  }
-  else if(phase==='roll'){
-    stepBall(ball,dt);
-    if(planarDist(ball)>CIRCLE.r){onOut();}
-    else if(ballSpeed(ball)<0.35&&ball.y<=R+0.03){onSettled();}
-    else if(now-phaseT>4000){onSettled();}
-  }
-  else if(phase==='kick'){
-    if(detectKick(now))onKick(now);
-    else if(now>kickDeadline)onKickTimeout();
-  }
-  else if(phase==='after'){
-    stepBall(ball,dt);
-    if(now-phaseT>1600)nextOrResult(now);
-  }
-  else if(phase==='wait'){
-    if(now-phaseT>600){
-      phase='precount';cdEnd=now+3200;cdLast=4;
-      $('countdown').classList.add('show');
-      $('analysis').classList.remove('show');
-    }
-  }
-  else if(phase==='precount'){
-    tickCountdown(now);
-  }
-  drawCircle(now);drawZone(now);drawBall(now);drawParticles(dt);
-}
-requestAnimationFrame(loop);
-
-/* ---------- 起動フロー ---------- */
-async function loadPoseModel(){
-  coach('AI骨格モデルを読込中…（初回は数秒かかります）');
-  const mod=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14');
-  const vision=await mod.FilesetResolver.forVisionTasks(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
-  poseLandmarker=await mod.PoseLandmarker.createFromOptions(vision,{
-    baseOptions:{
-      modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
-      delegate:'GPU'},
-    runningMode:'VIDEO',numPoses:1});
-  poseReady=true;
-}
-async function startCamFlow(){
-  state='loading';
-  try{
-    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('no-camera-api');
-    const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280}},audio:false});
-    video.srcObject=s;await video.play();
-    camReady=true;initRec();
-    if(!poseReady)await loadPoseModel();
-    resetSession();
-    state='positioning';posOkSince=null;
-    coach('画面の<b>左端か右端に斜めに</b>立ってください。全身が映るとカウント開始。');
-  }catch(e){
-    coach('カメラ/AIモデルを起動できませんでした（'+(e.name||e.message||'blocked')+'）。<b>センサーモード</b>に切り替えます。');
-    inputMode='sensor';startSensorFlow();
-  }
-}
-async function startSensorFlow(){
-  try{
-    if(typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission==='function'){
-      const st=await DeviceMotionEvent.requestPermission();
-      if(st!=='granted')throw new Error('denied');
-    }
-    if(typeof DeviceMotionEvent==='undefined')throw new Error('unsupported');
-    let got=false;
-    addEventListener('devicemotion',e=>{
-      if(inputMode!=='sensor')return;
-      let mag=0;
-      if(e.acceleration&&e.acceleration.x!==null){
-        mag=Math.hypot(e.acceleration.x||0,e.acceleration.y||0,e.acceleration.z||0)*8;
-      }else if(e.accelerationIncludingGravity){
-        const g=e.accelerationIncludingGravity;
-        mag=Math.abs(Math.hypot(g.x||0,g.y||0,g.z||0)-9.81)*6;
+function stopRecording(onReady) {
+  if (!mediaRecorder) { onReady && onReady(false); return; }
+  const mr = mediaRecorder;
+  mediaRecorder = null;
+  mr.onstop = () => {
+    try {
+      const blob = new Blob(recChunks, { type: recMime || "video/webm" });
+      if (blob.size > 0) {
+        recBlobUrl = URL.createObjectURL(blob);
+        onReady && onReady(true);
+        return;
       }
-      got=true;
-      const zone=Math.min(100,mag);
-      const now=performance.now();
-      motionBuf.push({t:now,zone});
-      while(motionBuf.length&&now-motionBuf[0].t>2000)motionBuf.shift();
-      $('meterFill').style.height=Math.min(100,zone*2.2)+'%';
-    });
-    setTimeout(()=>{
-      if(!got&&inputMode==='sensor'){
-        coach('センサーが検出できません。<b>タップモード</b>に切替。');
-        inputMode='tap';startTapFlow();
-      }
-    },2000);
-    hideVideo();resetSession();
-    coach('スマホ＝利き足。<b>接触の瞬間に引く</b>＝トラップ / KICK!で<b>鋭く振る</b>。');
-    startCountdown(performance.now());
-  }catch(e){
-    coach('センサー許可が得られず、<b>タップモード</b>で開始します。');
-    inputMode='tap';startTapFlow();
+    } catch {}
+    onReady && onReady(false);
+  };
+  try { mr.stop(); } catch { onReady && onReady(false); }
+}
+function drawRecordingFrame() {
+  if (!recCtx || !mediaRecorder) return;
+  const rw = recCanvas.width, rh = recCanvas.height;
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (vw && vh) {
+    const sc = Math.max(rw / vw, rh / vh);
+    const dw = vw * sc, dh = vh * sc;
+    const ox = (rw - dw) / 2, oy = (rh - dh) / 2;
+    if (mirrored) { recCtx.save(); recCtx.scale(-1, 1); recCtx.drawImage(video, -(ox + dw), oy, dw, dh); recCtx.restore(); }
+    else recCtx.drawImage(video, ox, oy, dw, dh);
+  } else {
+    recCtx.fillStyle = "#000"; recCtx.fillRect(0, 0, rw, rh);
   }
+  recCtx.drawImage(canvas, 0, 0, rw, rh);
 }
-function startTapFlow(){
-  hideVideo();resetSession();
-  coach('<b>接触の瞬間タップ→0.2秒ホールドで吸収</b> / KICK!で即タップ。');
-  startCountdown(performance.now());
+function openReplay() {
+  if (!recBlobUrl) return;
+  show($("replay-overlay"));
+  const v = $("replay-video");
+  v.src = recBlobUrl;
+  v.currentTime = 0;
+  v.play().catch(() => {});
 }
-function hideVideo(){
-  video.classList.add('hidden');
-  document.body.style.background='radial-gradient(100% 100% at 50% 30%, #14301f, #0B1F16)';
-}
-function resetSession(){
-  score=0;streak=0;level=0;ballNum=0;
-  sessionTrapQs=[];sessionKickTs=[];sessionOuts=0;
-  sessionSuccess=0;sessionStart=performance.now();
-  $('timeVal').textContent='0:00';
-  lastClip=null;$('btnReplay').classList.remove('show');
-  updateHUD();
+function closeReplay() {
+  const v = $("replay-video");
+  try { v.pause(); } catch {}
+  hide($("replay-overlay"));
 }
 
-/* ---------- UIイベント ---------- */
-function chipGroup(id,onSel){
-  const g=$(id);
-  g.addEventListener('click',e=>{
-    const c=e.target.closest('.chip');if(!c)return;
-    g.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel'));
-    c.classList.add('sel');onSel(c.dataset.v);
+/* ---------------- ポジショニング(骨格検知→カウント) ---------------- */
+function handlePositioning(nowMs) {
+  const bothFeet = feet.left && feet.right;
+  const poseAlive = nowMs - poseSeenAt < 600;
+  if (bothFeet && poseAlive) {
+    if (!positioningStableSince) positioningStableSince = nowMs;
+    const held = nowMs - positioningStableSince;
+    positioningPill.textContent = "骨格検知OK! そのまま動かないで…";
+    positioningPill.classList.add("ok");
+    if (held >= 1200) beginPlay();
+  } else {
+    positioningStableSince = 0;
+    positioningPill.classList.remove("ok");
+    positioningPill.textContent = poseAlive
+      ? "足元までカメラに映るように下がってください"
+      : "画面の左端か右端に立って、全身を映してください";
+  }
+  drawFoot(feet.left, nowMs);
+  drawFoot(feet.right, nowMs);
+}
+
+/* ---------------- 毎球カウント3 ---------------- */
+function startBallCount(nowMs) {
+  sub = "precount";
+  cdEnd = nowMs + 3200;
+  cdLast = 4;
+  analysisEl.classList.remove("show");
+  countdownNum.textContent = "3";
+  show(countdownEl);
+}
+function tickBallCount(nowMs) {
+  const remain = Math.max(0, cdEnd - nowMs);
+  const n = Math.ceil(remain / 1000);
+  if (n !== cdLast && n > 0) { cdLast = n; countdownNum.textContent = String(n); playBeep(n === 1 ? 880 : 660, 0.1); vibrate(15); }
+  if (remain <= 0) {
+    hide(countdownEl);
+    playBeep(1320, 0.15, 0.22);
+    serve(nowMs);
+  }
+}
+
+/* ---------------- ゲームフロー ---------------- */
+function beginPlay() {
+  phase = "playing";
+  hide(positioningMsg);
+  playBeep(1320, 0.25, 0.22);
+  score = 0; ballsDone = 0; hits = 0; outs = 0; misses = 0; slows = 0;
+  combo = 0; maxCombo = 0; perfectKicks = 0;
+  trapQs = []; kickTs = [];
+  particles = []; popups = []; ball = null;
+  activeMs = 0;
+  const cfg = DIFFICULTY[difficulty];
+  timeRemaining = cfg.timeLimit;
+  scoreVal.textContent = "0";
+  updateSuccHud();
+  updateTimeHud();
+  hudTime.classList.remove("warn");
+  show(hud);
+  if (!freeMode) startRecording();
+  if (gameMode === "TIME" && !freeMode) {
+    if (timerHandle) clearInterval(timerHandle);
+    timerHandle = setInterval(() => {
+      if (phase !== "playing" || sub === "precount") return;  // カウント中は時計停止
+      timeRemaining--;
+      updateTimeHud();
+      if (timeRemaining <= 10 && timeRemaining > 0) {
+        hudTime.classList.add("warn");
+        playBeep(660, 0.08, 0.12);
+      }
+      if (timeRemaining <= 0) endGame();
+    }, 1000);
+  }
+  startBallCount(performance.now());
+}
+function updateTimeHud() {
+  if (gameMode === "TIME" && !freeMode) timeVal.textContent = String(Math.max(0, timeRemaining));
+  else timeVal.textContent = fmtTime(activeMs / 1000);
+}
+function updateSuccHud() {
+  const total = gameMode === "BALLS" && !freeMode ? BALLS_PER_GAME : ballsDone;
+  succVal.textContent = `${hits}/${Math.max(total, ballsDone)}`;
+}
+function finishBall(nowMs) {
+  ballsDone++;
+  updateSuccHud();
+  ball = null;
+  if (gameMode === "BALLS" && !freeMode && ballsDone >= BALLS_PER_GAME) { endGame(); return; }
+  if (gameMode === "TIME" && !freeMode && timeRemaining <= 0) { endGame(); return; }
+  startBallCount(nowMs);
+}
+function endGame() {
+  if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
+  if (phase !== "playing") return;
+  phase = "result";
+  sub = "idle";
+  playWhistle();
+  vibrate([80, 60, 80]);
+  hide(hud);
+  hide(countdownEl);
+  analysisEl.classList.remove("show");
+  comboBanner.classList.remove("show");
+  hide(flipBtn); hide(quitBtn);
+
+  const total = ballsDone;
+  const rate = total > 0 ? Math.round((hits / total) * 100) : 0;
+  const avgQ = trapQs.length ? trapQs.reduce((a, b) => a + b, 0) / trapQs.length : 0;
+  const avgKick = kickTs.length ? kickTs.reduce((a, b) => a + b, 0) / kickTs.length : null;
+  const rank = (rate >= 85 && outs === 0 && avgQ >= 0.72) ? "S" : rate >= 70 ? "A" : rate >= 45 ? "B" : "C";
+
+  const streak = updateStreak();
+  $("streak-result").textContent = streak >= 2 ? `🔥 ${streak}日連続トレーニング中!` : "今日のトレーニング完了!";
+  $("rank-badge").textContent = rank;
+  $("result-score").textContent = String(score);
+  $("r-hits").textContent = `${hits}/${total}`;
+  $("r-rate").textContent = `${rate}%`;
+  $("r-avgq").textContent = trapQs.length ? Math.round(avgQ * 100) + "%" : "-";
+  $("r-kick").textContent = avgKick != null ? avgKick.toFixed(2) + "秒" : "-";
+  $("r-out").textContent = String(outs + misses);
+  $("r-perfect").textContent = String(perfectKicks);
+
+  const DIFF_NAME = { EASY: "イージー", NORMAL: "ノーマル", HARD: "ハード", REAL: "リアル" };
+  const modeName = gameMode === "TIME" ? "タイムアタック" : "10球チャレンジ";
+  lastResultSummary = `⚽トラップコントロールチャレンジ ${modeName}(${DIFF_NAME[difficulty]})で ${score}点・ランク${rank}!成功${hits}/${total}` + (avgKick != null ? `・平均キック${avgKick.toFixed(2)}秒` : "");
+
+  if (freeMode) {
+    hide($("newrecord"));
+  } else {
+    const prev = getHighScore(difficulty);
+    if (score > prev) { setHighScore(difficulty, score); show($("newrecord")); }
+    else hide($("newrecord"));
+    pushScoreHistory(gameMode, difficulty, score);
+  }
+  // 録画停止→リプレイボタン
+  const rb = $("replay-view-btn");
+  const sb = $("replay-save-btn");
+  hide(rb); hide(sb);
+  stopRecording((ok) => {
+    if (ok && !freeMode) {
+      show(rb);
+      sb.href = recBlobUrl;
+      sb.download = `trapcontrol_replay_${Date.now()}.${(recMime || "").includes("mp4") ? "mp4" : "webm"}`;
+      show(sb);
+    }
   });
+  setScreen("result");
 }
-chipGroup('chipsMode',v=>gameMode=v);
-chipGroup('chipsInput',v=>inputMode=v);
+function backToHome() {
+  if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
+  stopRecording(() => {});
+  phase = "start";
+  sub = "idle";
+  ball = null;
+  hide(hud); hide(positioningMsg); hide(countdownEl);
+  analysisEl.classList.remove("show");
+  hide(flipBtn); hide(quitBtn);
+  stopCamera();
+  setScreen("start");
+}
+async function startGameFlow() {
+  initAudio();
+  const errorBoxDiff = $("error-box-diff");
+  errorBoxDiff.classList.add("hidden");
+  setScreen("loading");
+  phase = "loading";
+  try {
+    $("loading-text").textContent = "カメラを起動しています…";
+    await startCamera();
+    $("loading-text").textContent = "AIモデルを読み込んでいます…";
+    await loadModel();
+  } catch (err) {
+    console.error(err);
+    setScreen("difficulty");
+    phase = "start";
+    errorBoxDiff.classList.remove("hidden");
+    const isPerm = err && (err.name === "NotAllowedError" || err.name === "SecurityError");
+    errorBoxDiff.textContent = isPerm
+      ? "カメラへのアクセスが許可されませんでした。ブラウザの設定でこのサイトのカメラを許可して、もう一度お試しください。(HTTPSまたはlocalhostでのアクセスが必要です)"
+      : `起動に失敗しました: ${err && err.message ? err.message : err}。通信環境を確認して再度お試しください。`;
+    return;
+  }
+  hide(screens.loading);
+  for (const k in screens) screens[k].classList.add("hidden");
+  phase = "positioning";
+  positioningStableSince = 0;
+  show(positioningMsg);
+  show(flipBtn); show(quitBtn);
+}
 
-$('btnStart').onclick=()=>{
-  $('menuOv').classList.add('hidden');
-  beep(660,0.08);
-  if(inputMode==='cam')startCamFlow();
-  else if(inputMode==='sensor')startSensorFlow();
-  else startTapFlow();
-};
-$('btnRetry').onclick=()=>{
-  $('resultOv').classList.add('hidden');
-  resetSession();
-  if(inputMode==='cam'){state='positioning';posOkSince=null;
-    coach('位置についてください。全身が枠に入るとカウント開始。');}
-  else startCountdown(performance.now());
-};
-$('btnMenu').onclick=()=>{
-  $('resultOv').classList.add('hidden');
-  $('menuOv').classList.remove('hidden');
-  state='menu';playing=false;
-  coach('モードを選んで開始してください。');
-};
-$('btnLastReplay').onclick=()=>{if(lastClip)playReplay();};
+/* ---------------- メインループ ---------------- */
+function resizeCanvas() {
+  const dpr = DPR();
+  canvas.width = Math.round(window.innerWidth * dpr);
+  canvas.height = Math.round(window.innerHeight * dpr);
+  canvas.style.width = window.innerWidth + "px";
+  canvas.style.height = window.innerHeight + "px";
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
 
-/* タップモード入力 */
-addEventListener('pointerdown',e=>{
-  if(state!=='play'||inputMode!=='tap')return;
-  if(phase==='flight'){tapDown=performance.now();tapUp=null;}
-  else if(phase==='kick'){onKick(performance.now());}
+function loop(nowMs) {
+  rafHandle = requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (nowMs - (lastFrameTs || nowMs)) / 1000);
+  lastFrameTs = nowMs;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const active = phase === "positioning" || phase === "playing";
+  if (!active) return;
+
+  updatePose(nowMs);
+
+  if (phase === "positioning") {
+    handlePositioning(nowMs);
+    return;
+  }
+
+  // ===== playing =====
+  if (sub !== "precount") {
+    activeMs += dt * 1000;
+    if (gameMode !== "TIME" || freeMode) {
+      if (!loop._lastTimeUpd || nowMs - loop._lastTimeUpd > 400) { loop._lastTimeUpd = nowMs; updateTimeHud(); }
+    }
+  }
+
+  if (sub === "precount") {
+    tickBallCount(nowMs);
+  } else if (sub === "flight") {
+    updateBall(dt, nowMs);
+  } else if (sub === "roll") {
+    updateBall(dt, nowMs);
+    const bodyH = anchorBodyH || canvas.height * 0.5;
+    const atGround = ball.y >= ball.ground - ball.r - 2;
+    if (Math.abs(ball.x - circleCx) > circleR || ball.x < -ball.r || ball.x > canvas.width + ball.r) {
+      ballOut();
+    } else if (atGround && Math.abs(ball.vx) < bodyH * 0.12 && Math.abs(ball.vy) < 30) {
+      ballSettled(nowMs);
+    } else if (nowMs - contactAt > 4500) {
+      ballSettled(nowMs);
+    }
+  } else if (sub === "kick") {
+    const k = detectKick(nowMs);
+    if (k) onKick(nowMs, k);
+    else if (nowMs > kickDeadline) onKickTimeout(nowMs);
+  } else if (sub === "after") {
+    updateBall(dt, nowMs);
+    if (nowMs - ballDoneAt > 1500) finishBall(nowMs);
+  }
+
+  updateParticles(dt);
+
+  // 描画
+  drawCircle(nowMs);
+  drawBall(nowMs);
+  drawRequiredPart(nowMs);
+  drawKickPrompt(nowMs);
+  drawFoot(feet.left, nowMs);
+  drawFoot(feet.right, nowMs);
+  drawParticles();
+  drawPopups(nowMs);
+  if (phase === "playing") drawRecordingFrame();
+}
+rafHandle = requestAnimationFrame(loop);
+
+/* ---------------- UIイベント ---------------- */
+const MODE_META = {
+  BALLS: { eyebrow: "TRAP & KICK", title: "10球チャレンジ", desc: "10球のトラップ精度×キックの速さでスコアを競う" },
+  TIME:  { eyebrow: "TIME ATTACK", title: "タイムアタック", desc: "制限時間内にどれだけ多くのボールをコントロールできるか(カウント中は時計が止まります)" },
+};
+function refreshHighScoreLine() {
+  renderBest5();
+  const st = getStreak();
+  $("streak-line").textContent = st >= 1 ? `🔥 連続トレーニング ${st}日` : "";
+}
+function openDifficultyScreen(mode) {
+  gameMode = mode;
+  const meta = MODE_META[mode];
+  $("diff-mode-label").textContent = meta.eyebrow;
+  $("diff-mode-title").textContent = meta.title;
+  $("diff-mode-desc").textContent = meta.desc;
+  refreshHighScoreLine();
+  setScreen("difficulty");
+}
+document.querySelectorAll(".mode-card").forEach((card) => {
+  card.addEventListener("click", () => {
+    initAudio();
+    playBeep(880, 0.08, 0.1);
+    openDifficultyScreen(card.dataset.mode);
+  });
 });
-addEventListener('pointerup',e=>{
-  if(state!=='play'||inputMode!=='tap')return;
-  tapUp=performance.now();
+$("diff-back-btn").addEventListener("click", () => {
+  playBeep(500, 0.06, 0.08);
+  setScreen("start");
 });
+document.querySelectorAll("#difficulty-row .diff-card").forEach((card) => {
+  card.addEventListener("click", () => {
+    document.querySelectorAll("#difficulty-row .diff-card").forEach((c) => c.classList.remove("selected"));
+    card.classList.add("selected");
+    difficulty = card.dataset.diff;
+    refreshHighScoreLine();
+    initAudio();
+    playBeep(740, 0.08, 0.1);
+  });
+});
+$("free-mode-card").addEventListener("click", () => {
+  freeMode = !freeMode;
+  $("free-mode-card").classList.toggle("selected", freeMode);
+  initAudio();
+  playBeep(freeMode ? 820 : 500, 0.08, 0.1);
+});
+$("start-btn").addEventListener("click", startGameFlow);
+$("replay-btn").addEventListener("click", () => {
+  initAudio();
+  hide(screens.result);
+  phase = "positioning";
+  positioningStableSince = 0;
+  ball = null; particles = []; popups = [];
+  show(positioningMsg);
+  show(flipBtn); show(quitBtn);
+});
+$("home-btn").addEventListener("click", backToHome);
+$("replay-view-btn").addEventListener("click", openReplay);
+$("replay-close-btn").addEventListener("click", closeReplay);
+$("share-btn").addEventListener("click", async () => {
+  const text = lastResultSummary || "⚽TRAP CONTROL CHALLENGE";
+  const url = location.href.split("#")[0];
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: "トラップコントロールチャレンジ", text, url });
+    } else {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      $("share-btn").textContent = "コピーしました!";
+      setTimeout(() => { $("share-btn").textContent = "結果をシェア"; }, 1800);
+    }
+  } catch {}
+});
+quitBtn.addEventListener("click", () => {
+  if (phase === "playing" && freeMode) endGame();
+  else backToHome();
+});
+flipBtn.addEventListener("click", async () => {
+  facingMode = facingMode === "environment" ? "user" : "environment";
+  try {
+    $("loading-text").textContent = "カメラを切り替えています…";
+    await startCamera();
+  } catch (e) {
+    console.error(e);
+  }
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && phase === "playing") {
+    endGame();
+  }
+});
+
+refreshHighScoreLine();
 </script>
 </body>
 </html>
