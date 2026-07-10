@@ -459,6 +459,7 @@
       <span>④吸収</span><div class="an-bar"><i id="an-cushion"></i></div><span class="an-pct" id="an-cushion-p">–</span>
     </div>
     <div id="an-foot"><span id="an-touch">–</span><span>⑤キック <b id="an-kick">–</b></span></div>
+    <div id="an-note" style="margin-top:6px;font-size:11px;color:#8892A6;font-weight:700;"></div>
   </div>
 
   <button id="flip-btn" class="hidden">カメラ切替</button>
@@ -590,11 +591,11 @@ import {
 
 /* ---------------- 定数・難易度設定 ---------------- */
 const DIFFICULTY = {
-  //           制限時間, 滞空秒,  ばらつき, 円半径(体高比), キック猶予ms, 倍率
-  EASY:   { timeLimit: 90, flight: 2.7, flightVar: 0.3, circle: 0.66, kickLimit: 4500, multiplier: 1.0, gravityF: 0.75 },
-  NORMAL: { timeLimit: 60, flight: 2.2, flightVar: 0.3, circle: 0.56, kickLimit: 3500, multiplier: 1.5, gravityF: 0.85 },
-  HARD:   { timeLimit: 45, flight: 1.75, flightVar: 0.25, circle: 0.47, kickLimit: 2800, multiplier: 2.0, gravityF: 1.0 },
-  REAL:   { timeLimit: 60, flight: 2.2, flightVar: 0.3, circle: 0.56, kickLimit: 3200, multiplier: 1.8, gravityF: 1.0, real: true },
+  //           制限時間, 滞空スケール, 円半径(体高比), キック猶予ms, 倍率, 重力係数(1.0=実物理)
+  EASY:   { timeLimit: 90, timeScale: 1.3,  circle: 0.66, kickLimit: 4500, multiplier: 1.0, gravityF: 0.88 },
+  NORMAL: { timeLimit: 60, timeScale: 1.05, circle: 0.56, kickLimit: 3500, multiplier: 1.5, gravityF: 0.96 },
+  HARD:   { timeLimit: 45, timeScale: 0.85, circle: 0.47, kickLimit: 2800, multiplier: 2.0, gravityF: 1.0 },
+  REAL:   { timeLimit: 60, timeScale: 1.0,  circle: 0.56, kickLimit: 3200, multiplier: 1.8, gravityF: 1.0, real: true },
 };
 const BALLS_PER_GAME = 10;          // 10球チャレンジ
 // トラップ部位
@@ -663,6 +664,7 @@ let lastFrameTs = 0;
 let positioningStableSince = 0;
 
 let bodyParts = {};               // footL/R, thighL/R, chest (+speed)
+let skel = null;                  // 骨格描画・姿勢分析用の全身ポイント
 let feet = { left: null, right: null };
 let prevFeet = { left: null, right: null };
 const poseBuf = [];               // 判定用スナップショット
@@ -997,13 +999,23 @@ function updatePose(nowMs) {
   if (hipR && kneeR && ankleR) kneeAngles.push(angleDeg(hipR, kneeR, ankleR));
   if (kneeAngles.length) knee = kneeAngles.reduce((a, b) => a + b, 0) / kneeAngles.length;
 
-  // 判定用スナップショット
+  // 骨格描画用ポイント(全身)
+  const shL = singleScreen(lms, LM.L_SHOULDER), shR = singleScreen(lms, LM.R_SHOULDER);
+  skel = {
+    nose, shL, shR, hipL, hipR, kneeL, kneeR, ankL: ankleL, ankR: ankleR,
+    ftL: singleScreen(lms, LM.L_FOOT), ftR: singleScreen(lms, LM.R_FOOT),
+  };
+
+  // 判定用スナップショット(姿勢指標つき)
   poseBuf.push({
     t: nowMs,
     footL: bodyParts.footL, footR: bodyParts.footR,
     thighL: bodyParts.thighL, thighR: bodyParts.thighR,
     chest: bodyParts.chest,
     knee, hipX: hipMid ? hipMid.x : null,
+    shX: shoulderMid ? shoulderMid.x : null,
+    shW: (shL && shR) ? Math.abs(shL.x - shR.x) : null,
+    stW: (ankleL && ankleR) ? Math.abs(ankleL.x - ankleR.x) : null,
   });
   while (poseBuf.length && nowMs - poseBuf[0].t > 2200) poseBuf.shift();
 }
@@ -1043,14 +1055,14 @@ function classifyTouch(ballPt, foot, side) {
   return { key, def: TOUCH_TYPES[key] };
 }
 
-/* ---------------- 重力(px/s^2) ---------------- */
+/* ---------------- 物理スケール(骨格の体高≒1.7mで px/m 換算) ---------------- */
+function ppm() {
+  const bodyH = anchorBodyH || canvas.height * 0.55;
+  return bodyH / 1.7;
+}
 function gAccel() {
-  const cfg = DIFFICULTY[difficulty];
-  if (cfg.real && anchorBodyH) {
-    const pxPerMeter = anchorBodyH / 1.7;   // 骨格の体高≒1.7mでpx/m換算
-    return 9.8 * pxPerMeter;
-  }
-  return cfg.gravityF * 1600 * DPR();
+  // 全難易度とも実重力9.81m/s^2ベース。イージーのみ僅かに浮きやすく補正
+  return 9.81 * ppm() * DIFFICULTY[difficulty].gravityF;
 }
 
 /* ---------------- サーブ(逆サイドから飛来) ---------------- */
@@ -1085,20 +1097,40 @@ function serve(nowMs) {
   tx = Math.max(W * 0.08, Math.min(W * 0.92, tx));
   ty = Math.max(H * 0.15, Math.min(ground - 4, ty));
 
-  const T = Math.max(1.1, cfg.flight + (Math.random() * 2 - 1) * cfg.flightVar);
+  // 球種: 部位に合う物理的な軌道を選ぶ
+  const type = requiredPart === "FOOT" ? (Math.random() < 0.55 ? "ground" : "driven")
+             : requiredPart === "THIGH" ? (Math.random() < 0.6 ? "driven" : "loft")
+             : (Math.random() < 0.7 ? "loft" : "driven");
+  const baseT = type === "loft" ? 1.7 + Math.random() * 0.6      // ロブ: 高い弧
+             : type === "driven" ? 0.95 + Math.random() * 0.35   // ライナー: 低く速い
+             : 1.3 + Math.random() * 0.5;                        // グラウンダー
+  let T = Math.max(0.7, baseT * cfg.timeScale);
   const g = gAccel();
-  const sy = ground - bodyH * (0.02 + Math.random() * 0.25);
-  const type = requiredPart === "FOOT" && Math.random() < 0.45 ? "ground" : "air";
+  const P = ppm();
   const r = Math.max(10, bodyH * 0.075);
 
-  ball = {
-    x: startX, y: type === "ground" ? ground - r : sy,
-    vx: (tx - startX) / T,
-    vy: type === "ground" ? 0 : (ty - (sy)) / T - 0.5 * g * T,
-    r, tx, ty, ground, type,
-    rot: 0, trail: [],
-  };
-  if (type === "ground") { ball.ty = ground - r; ball.vy = 0; }
+  if (type === "ground") {
+    // 転がり: 摩擦減速 a のもとで T 秒後に目標へ届く初速を厳密に解く
+    ty = ground - r;
+    const a = 1.2 * P;                                  // 芝の転がり抵抗 ≒1.2 m/s^2
+    const d = tx - startX;
+    const v0 = (d + 0.5 * a * T * T * Math.sign(d)) / T;
+    ball = { x: startX, y: ground - r, vx: v0, vy: 0, ax: -Math.sign(v0) * a,
+             r, tx, ty, ground, type, rot: 0, trail: [] };
+  } else {
+    // 弾道: 実重力での放物線 y(T)=sy+vy0·T+½gT²=ty (画面yは下向き正)。
+    // 頂点が画面上端を超える場合は滞空を短縮して物理的に整合させる
+    const sy = ground - r;                               // 地上からの蹴り出し
+    let vy0 = 0;
+    for (let i = 0; i < 7; i++) {
+      vy0 = (ty - sy) / T - 0.5 * g * T;
+      const apexY = vy0 < 0 ? sy - (vy0 * vy0) / (2 * g) : sy;
+      if (apexY > H * 0.05 || T <= 0.75) break;
+      T *= 0.85;
+    }
+    ball = { x: startX, y: sy, vx: (tx - startX) / T, vy: vy0,
+             r, tx, ty, ground, type, rot: 0, trail: [] };
+  }
   contactAt = nowMs + T * 1000;
   trapResult = null;
   sub = "flight";
@@ -1111,29 +1143,38 @@ function updateBall(dt, nowMs) {
   if (!ball) return;
   const g = gAccel();
   if (sub === "flight") {
-    ball.x += ball.vx * dt;
     if (ball.type === "ground") {
-      // グラウンダー: 地面を小さく弾みながら
-      ball.vy += g * dt;
-      ball.y += ball.vy * dt;
-      if (ball.y > ball.ground - ball.r) { ball.y = ball.ground - ball.r; ball.vy = -Math.abs(ball.vy) * 0.35 - 30; }
+      // 転がり: 摩擦減速のみ(等加速度)
+      const dv = ball.ax * dt;
+      if (Math.abs(dv) < Math.abs(ball.vx)) ball.vx += dv;
+      ball.x += ball.vx * dt;
+      ball.y = ball.ground - ball.r;
     } else {
+      ball.x += ball.vx * dt;
       ball.vy += g * dt;
       ball.y += ball.vy * dt;
+      if (ball.y > ball.ground - ball.r && ball.vy > 0) {
+        // 実物のボールの反発係数≒0.6でワンバウンド
+        ball.y = ball.ground - ball.r;
+        ball.vy *= -0.6;
+        ball.vx *= 0.85;
+      }
     }
     ball.rot += (ball.vx / (ball.r * 2)) * dt;
     if (nowMs >= contactAt) { ball.x = ball.tx; ball.y = ball.ty; resolveTrap(nowMs); }
   } else if (sub === "roll" || sub === "after" || sub === "kick") {
+    const P = ppm();
     ball.vy += g * dt;
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
     if (ball.y > ball.ground - ball.r && ball.vy > 0) {
       ball.y = ball.ground - ball.r;
-      ball.vy *= -0.45;
-      if (Math.abs(ball.vy) < 40) ball.vy = 0;
+      ball.vy *= -0.55;                                   // 反発係数
+      if (Math.abs(ball.vy) < 0.3 * P) ball.vy = 0;
     }
     if (ball.y >= ball.ground - ball.r - 1) {
-      ball.vx *= Math.max(0, 1 - 1.7 * dt);   // 転がり摩擦
+      const a = 2.0 * P * dt;                             // 転がり摩擦 ≒2.0 m/s^2
+      ball.vx = Math.abs(ball.vx) <= a ? 0 : ball.vx - Math.sign(ball.vx) * a;
     }
     ball.rot += (ball.vx / (ball.r * 2)) * dt;
   }
@@ -1173,17 +1214,27 @@ function judgeTrap(contactT) {
   const after = series.filter((s) => s.t > contactT + 40 && s.t < contactT + 380);
   const afterAvg = after.length ? after.reduce((a, s) => a + s.speed, 0) / after.length : peak;
   const cushion = Math.max(0, 1 - Math.abs(afterAvg / (peak || 1) - 0.45) / 0.45);
-  // ①姿勢/構え: 到達前の膝屈曲 + ボールラインへの寄せ
-  const pre = poseBuf.filter((e) => e.t > contactT - 650 && e.t < contactT - 150);
-  let posture = 0.5;
-  const preKnees = pre.map((e) => e.knee).filter((k) => k != null);
-  const preHips = pre.map((e) => e.hipX).filter((x) => x != null);
-  if (preKnees.length || preHips.length) {
-    const kneeScore = preKnees.length
-      ? Math.max(0, Math.min(1, (172 - preKnees.reduce((a, b) => a + b, 0) / preKnees.length) / 30)) : 0.5;
-    const posScore = preHips.length
-      ? Math.max(0, 1 - Math.abs(preHips.reduce((a, b) => a + b, 0) / preHips.length - bp.x) / (bodyH * 0.9)) : 0.5;
-    posture = kneeScore * 0.5 + posScore * 0.5;
+  // ①姿勢/構え(このゲームの主役): 膝屈曲・正面への寄せ・スタンス幅・上体の安定
+  const pre = poseBuf.filter((e) => e.t > contactT - 650 && e.t < contactT - 120);
+  let posture = 0.5, postureNote = "";
+  {
+    const avg = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+    const kneeAvg = avg(pre.map((e) => e.knee).filter((v) => v != null));
+    const hipAvg  = avg(pre.map((e) => e.hipX).filter((v) => v != null));
+    const shAvg   = avg(pre.map((e) => e.shX).filter((v) => v != null));
+    const shWAvg  = avg(pre.map((e) => e.shW).filter((v) => v != null));
+    const stWAvg  = avg(pre.map((e) => e.stW).filter((v) => v != null));
+    const kneeScore   = kneeAvg != null ? Math.max(0, Math.min(1, (172 - kneeAvg) / 30)) : 0.5;
+    const alignScore  = hipAvg != null ? Math.max(0, 1 - Math.abs(hipAvg - bp.x) / (bodyH * 0.8)) : 0.5;
+    const stanceScore = (stWAvg != null && shWAvg) ? Math.max(0, 1 - Math.abs(stWAvg / shWAvg - 1.15) / 0.9) : 0.5;
+    const leanScore   = (shAvg != null && hipAvg != null) ? Math.max(0, 1 - Math.abs(shAvg - hipAvg) / (bodyH * 0.22)) : 0.5;
+    posture = kneeScore * 0.35 + alignScore * 0.3 + stanceScore * 0.2 + leanScore * 0.15;
+    const worst = Math.min(kneeScore, alignScore, stanceScore, leanScore);
+    postureNote = posture > 0.72 ? "良い構えです◎"
+      : worst === kneeScore   ? "膝が伸びています — 重心を低く"
+      : worst === alignScore  ? "ボールの正面に体を運んで"
+      : worst === stanceScore ? "スタンスは肩幅より少し広く"
+      : "上体がブレています — 頭を安定させて";
   }
   // 足トラップ時: タッチ部位6分類
   let touchLabel = PARTS[requiredPart].label;
@@ -1194,8 +1245,9 @@ function judgeTrap(contactT) {
     else { foot = fl || fr; side = fl ? "L" : "R"; }
     if (foot) touchLabel = classifyTouch(bp, foot, side).def.label;
   }
-  const q = timing * 0.3 + cushion * 0.3 + point * 0.2 + posture * 0.2;
-  return { miss: false, q, timing, cushion, point, posture, dtErr, touchLabel, wave: series };
+  // 姿勢を主役に: ①姿勢30% + ④吸収30% + ③タイミング20% + ②ポイント20%
+  const q = posture * 0.3 + cushion * 0.3 + timing * 0.2 + point * 0.2;
+  return { miss: false, q, timing, cushion, point, posture, postureNote, dtErr, touchLabel, wave: series };
 }
 function resolveTrap(nowMs) {
   const r = judgeTrap(contactAt);
@@ -1210,14 +1262,14 @@ function resolveTrap(nowMs) {
     sub = "roll";     // 素通り→そのまま円外へ
     return;
   }
-  // トラップ品質→跳ね返り
+  // トラップ品質→跳ね返り(物理: 吸収できなかった運動量が残る)
   const q = r.q;
   trapQs.push(q);
-  const vmax = bodyH * 2.6;
-  const speed = vmax * 0.12 + (1 - q) * vmax;
+  const P = ppm();
+  const speed = P * (0.4 + (1 - q) * 4.2);        // 0.4〜4.6 m/s
   const dirOut = Math.random() < 0.5 ? -1 : 1;
   ball.vx = dirOut * speed * (0.6 + Math.random() * 0.4);
-  ball.vy = -(1 - q) * bodyH * 1.1 - 40;
+  ball.vy = -P * ((1 - q) * 2.0 + 0.2);           // 硬いタッチほど跳ね上がる(最大≒2.2m/s)
   let grade, color;
   if (q > 0.78) { grade = "PERFECT TOUCH"; color = "#FFC53D"; playBeep(1100, 0.14, 0.22); }
   else if (q > 0.55) { grade = "GOOD"; color = "#1FE0D8"; playBeep(880, 0.1); }
@@ -1280,10 +1332,11 @@ function onKick(nowMs, k) {
   addPopup(ball.x, ball.y - 80, `+${pts}`, "#FFC53D", 1300);
   if (k.perfect) addPopup(ball.x, ball.y - 130, "PERFECT KICK", "#FFC53D", 1100);
   burst(ball.x, ball.y, "#FFC53D");
-  // 蹴り出す
+  // 蹴り出す(実速度13〜17m/s相当のパス)
+  const P2 = ppm();
   const dir = ball.x < canvas.width / 2 ? 1 : -1;
-  ball.vx = dir * (anchorBodyH || 400) * (3 + Math.random());
-  ball.vy = -(anchorBodyH || 400) * 1.4;
+  ball.vx = dir * P2 * (13 + Math.random() * 4);
+  ball.vy = -P2 * (4 + Math.random() * 2);
   showAnalysisCard(trapResult, { t: kickT, perfect: k.perfect });
   sub = "after";
   ballDoneAt = nowMs;
@@ -1319,6 +1372,7 @@ function showAnalysisCard(r, kick) {
   set("an-cushion", "an-cushion-p", rr.cushion);
   $("an-touch").textContent = r && r.miss ? "MISS — " + (r.reason || "") : "タッチ: " + (rr.touchLabel || "—");
   $("an-kick").textContent = !kick ? "—" : kick.t == null ? "TIMEOUT" : kick.t.toFixed(2) + "s" + (kick.perfect ? " ⚡" : "");
+  $("an-note").textContent = r && !r.miss ? ("姿勢: " + (r.postureNote || "")) : "落下点に先に入って構えましょう";
   // 波形(部位速度)
   const wc = $("an-wave"), wx = wc.getContext("2d");
   wx.clearRect(0, 0, wc.width, wc.height);
@@ -1421,6 +1475,48 @@ function drawFoot(f, nowMs) {
   ctx.shadowColor = hot ? "rgba(255,197,61,.8)" : "rgba(35,224,255,.6)";
   ctx.shadowBlur = 12 * DPR();
   ctx.beginPath(); ctx.arc(f.x, f.y, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+}
+/* ---------------- AI骨格ラインの常時表示 ---------------- */
+const SKEL_BONES = [
+  ["shL", "shR"], ["shL", "hipL"], ["shR", "hipR"], ["hipL", "hipR"],
+  ["hipL", "kneeL"], ["kneeL", "ankL"], ["hipR", "kneeR"], ["kneeR", "ankR"],
+  ["ankL", "ftL"], ["ankR", "ftR"],
+];
+function drawSkeleton() {
+  if (!skel) return;
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.strokeStyle = "#1FE0D8";
+  ctx.lineWidth = 2 * DPR();
+  for (const [a, b] of SKEL_BONES) {
+    const p = skel[a], q2 = skel[b];
+    if (!p || !q2) continue;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
+  }
+  ctx.fillStyle = "#1FE0D8";
+  for (const k in skel) {
+    const p = skel[k];
+    if (!p) continue;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 2.5 * DPR(), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+/* ---------------- 飛行中のリアルタイム構え判定(姿勢が主役) ---------------- */
+function drawPostureLive(nowMs) {
+  if (phase !== "playing" || sub !== "flight" || !poseBuf.length || !ball) return;
+  const e = poseBuf[poseBuf.length - 1];
+  const bodyH = anchorBodyH || canvas.height * 0.5;
+  const kneeOK = e.knee != null && e.knee < 165;
+  const alignOK = e.hipX != null && Math.abs(e.hipX - ball.tx) < bodyH * 0.5;
+  const ok = kneeOK && alignOK;
+  const gy = Math.min((anchorGround || canvas.height * 0.85) + 34 * DPR(), canvas.height - 14 * DPR());
+  ctx.save();
+  ctx.font = `800 ${Math.round(13 * DPR())}px 'M PLUS 1', sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillStyle = ok ? "#7CFC9A" : "#FF9F43";
+  ctx.shadowColor = "rgba(0,0,0,.7)"; ctx.shadowBlur = 6 * DPR();
+  ctx.fillText(ok ? "構えOK" : !alignOK ? "ボールの正面へ!" : "膝を曲げて!", circleCx, gy);
   ctx.restore();
 }
 function drawRequiredPart(nowMs) {
@@ -1587,6 +1683,7 @@ function handlePositioning(nowMs) {
       ? "足元までカメラに映るように下がってください"
       : "画面の左端か右端に立って、全身を映してください";
   }
+  drawSkeleton();
   drawFoot(feet.left, nowMs);
   drawFoot(feet.right, nowMs);
 }
@@ -1804,7 +1901,7 @@ function loop(nowMs) {
     const atGround = ball.y >= ball.ground - ball.r - 2;
     if (Math.abs(ball.x - circleCx) > circleR || ball.x < -ball.r || ball.x > canvas.width + ball.r) {
       ballOut();
-    } else if (atGround && Math.abs(ball.vx) < bodyH * 0.12 && Math.abs(ball.vy) < 30) {
+    } else if (atGround && Math.abs(ball.vx) < ppm() * 0.35 && Math.abs(ball.vy) < ppm() * 0.3) {
       ballSettled(nowMs);
     } else if (nowMs - contactAt > 4500) {
       ballSettled(nowMs);
@@ -1821,9 +1918,11 @@ function loop(nowMs) {
   updateParticles(dt);
 
   // 描画
+  drawSkeleton();
   drawCircle(nowMs);
   drawBall(nowMs);
   drawRequiredPart(nowMs);
+  drawPostureLive(nowMs);
   drawKickPrompt(nowMs);
   drawFoot(feet.left, nowMs);
   drawFoot(feet.right, nowMs);
